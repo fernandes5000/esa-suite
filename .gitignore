@@ -1,0 +1,49 @@
+# System files
+.DS_Store
+Thumbs.db
+
+# Docker
+docker/*.pid
+*.pid
+*.log
+docker-compose.override.yml
+.env
+.env.*backup*
+
+# Docker volumes / bind mounts
+mysql_data/
+redis_data/
+storage/
+vendor/
+
+# Logs
+*.log
+logs/
+**/storage/logs/*
+**/storage/framework/*
+**/storage/debugbar/*
+
+# Node
+node_modules/
+npm-debug.log
+pnpm-lock.yaml
+yarn.lock
+
+# Editor/IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Laravel compiled output
+bootstrap/cache/*.php
+
+# Ignore Laravel vendor folders if mistakenly placed in root
+api/vendor/
+web/vendor/
+
+# Composer
+composer.lock
+
+# Misc
+*.cache
