@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -24,25 +24,47 @@
                         <div class="hidden space-x-8 sm:-my-px sm:ml-10 sm:flex">
                             <a href="{{ route('dashboard') }}" 
                                class="inline-flex items-center px-1 pt-1 border-b-2 {{ request()->routeIs('dashboard') ? 'border-blue-500 text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }} text-sm font-medium transition">
-                                Dashboard
+                                {{ __('Dashboard') }}
                             </a>
                             <a href="{{ route('pets.index') }}" 
                                class="inline-flex items-center px-1 pt-1 border-b-2 {{ request()->routeIs('pets.index') ? 'border-blue-500 text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }} text-sm font-medium transition">
-                                My Pets
+                                {{ __('My Pets') }}
                             </a>
                         </div>
                     </div>
                     
                     <div class="hidden sm:flex sm:items-center sm:ml-6">
-                        <span class="text-sm text-gray-700 mr-4">
-                            Welcome, {{ session('user_name', 'User') }}
+                        <div class="relative ml-3">
+                            @php
+                                $locales = ['en' => '🇺🇸', 'es' => '🇪🇸', 'pt_BR' => '🇧🇷'];
+                                $currentLocale = app()->getLocale();
+                            @endphp
+                            
+                            <button class="flex items-center text-xl" onclick="this.nextElementSibling.classList.toggle('hidden')">
+                                {{ $locales[$currentLocale] }}
+                            </button>
+                            
+                            <div class="absolute right-0 mt-2 w-20 bg-white rounded-md shadow-lg py-1 z-10 hidden" onclick="this.classList.toggle('hidden')">
+                                @foreach ($locales as $locale => $flag)
+                                    @if ($locale != $currentLocale)
+                                        <a href="{{ route('language.switch', $locale) }}" 
+                                           class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 text-center text-xl">
+                                            {{ $flag }}
+                                        </a>
+                                    @endif
+                                @endforeach
+                            </div>
+                        </div>
+                        
+                        <span class="text-sm text-gray-700 mr-4 ml-4">
+                            {{ __('Welcome') }}, {{ session('user_name', 'User') }}
                         </span>
                         
                         <form method="POST" action="{{ route('logout') }}" class="m-0">
                             @csrf
                             <button type="submit" 
                                     class="text-sm text-gray-500 hover:text-red-500 transition">
-                                Logout
+                                {{ __('Logout') }}
                             </button>
                         </form>
                     </div>
@@ -65,9 +87,8 @@
             
             {{ $slot ?? '' }} 
         </main>
-        
         <footer class="bg-gray-200 p-4 text-center text-sm text-gray-600 mt-auto">
-            &copy; {{ date('Y') }} ESA Project Demo. All rights reserved.
+            {{ __('© :year ESA Project Demo. All rights reserved.', ['year' => date('Y')]) }}
         </footer>
     </div>
     

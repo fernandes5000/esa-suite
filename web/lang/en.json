@@ -1,0 +1,19 @@
+{
+    "Dashboard": "Dashboard",
+    "My Pets": "My Pets",
+    "Welcome": "Welcome",
+    "Logout": "Logout",
+    "Email": "Email",
+    "Password": "Password",
+    "Log in": "Log in",
+    "You are logged in.": "You are logged in.",
+    "Add New Pet": "Add New Pet",
+    "Name": "Name",
+    "Type": "Type",
+    "Breed": "Breed",
+    "Age": "Age",
+    "Edit": "Edit",
+    "You have not added any pets yet.": "You have not added any pets yet.",
+    "Failed to load pets.": "Failed to load pets.",
+    "© :year ESA Project Demo. All rights reserved.": "© :year ESA Project Demo. All rights reserved."
+}

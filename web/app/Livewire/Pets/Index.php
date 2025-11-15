@@ -17,13 +17,13 @@ class Index extends Component
             $this->pets = $res['data'] ?? [];
         } else {
             $this->pets = [];
-            session()->flash('error', $res['error'] ?? 'Failed to load pets.');
+            session()->flash('error', $res['error'] ?? __('Failed to load pets.'));
         }
     }
 
     public function render()
     {
         return view('livewire.pets.index')
-            ->layout('layouts.app', ['header' => 'My Pets']);
+            ->layout('layouts.app', ['header' => __('My Pets')]);
     }
 }

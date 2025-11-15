@@ -1,0 +1,19 @@
+{
+    "Dashboard": "Painel",
+    "My Pets": "Meus Pets",
+    "Welcome": "Bem-vindo",
+    "Logout": "Sair",
+    "Email": "E-mail",
+    "Password": "Senha",
+    "Log in": "Entrar",
+    "You are logged in.": "Você está logado.",
+    "Add New Pet": "Adicionar Novo Pet",
+    "Name": "Nome",
+    "Type": "Tipo",
+    "Breed": "Raça",
+    "Age": "Idade",
+    "Edit": "Editar",
+    "You have not added any pets yet.": "Você ainda não adicionou nenhum pet.",
+    "Failed to load pets.": "Falha ao carregar os pets.",
+    "© :year ESA Project Demo. All rights reserved.": "© :year ESA Project Demo. Todos os direitos reservados."
+}
