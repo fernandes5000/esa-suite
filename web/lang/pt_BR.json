@@ -15,5 +15,11 @@
     "Edit": "Editar",
     "You have not added any pets yet.": "Você ainda não adicionou nenhum pet.",
     "Failed to load pets.": "Falha ao carregar os pets.",
-    "© :year ESA Project Demo. All rights reserved.": "© :year ESA Project Demo. Todos os direitos reservados."
+    "© :year ESA Project Demo. All rights reserved.": "© :year ESA Project Demo. Todos os direitos reservados.",
+    "Add Pet Modal Title": "Adicionar Novo Pet",
+    "Age (optional)": "Idade (opcional)",
+    "Notes (optional)": "Notas (opcional)",
+    "Save Pet": "Salvar Pet",
+    "Cancel": "Cancelar",
+    "Pet added successfully!": "Pet adicionado com sucesso!"
 }
