@@ -4,11 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use Illuminate\Http\Request;
+use App\Http\Traits\ApiResponseTrait;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
+    use ApiResponseTrait;
+
     public function register(Request $request)
     {
         $data = $request->validate([
@@ -25,10 +28,10 @@ class AuthController extends Controller
 
         $token = $user->createToken('api')->plainTextToken;
 
-        return [
+        return $this->apiSuccess([
             'user' => $user,
             'token' => $token,
-        ];
+        ], 201);
     }
 
     public function login(Request $request)
@@ -46,16 +49,16 @@ class AuthController extends Controller
             ]);
         }
 
-        return [
+        return $this->apiSuccess([
             'user' => $user,
             'token' => $user->createToken('api')->plainTextToken,
-        ];
+        ]);
     }
 
     public function logout(Request $request)
     {
         $request->user()->currentAccessToken()->delete();
 
-        return ['message' => 'Logged out'];
+        return $this->apiSuccess(['message' => 'Logged out']);
     }
 }

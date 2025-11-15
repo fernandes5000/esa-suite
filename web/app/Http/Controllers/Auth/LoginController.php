@@ -30,7 +30,10 @@ class LoginController extends Controller
             ]);
         }
 
-        session(['api_token' => $response['token']]);
+        session([
+            'api_token' => $response['data']['token'],
+            'user_name' => $response['data']['user']['name']
+        ]);
 
         return redirect()->route('dashboard');
     }

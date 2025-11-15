@@ -2,23 +2,24 @@
 
 namespace App\Http\Controllers\Api\V1;
 
-use App\Http\Controllers\Controller;
-use App\Http\Requests\StorePetRequest;
-use App\Http\Requests\UpdatePetRequest;
 use App\Models\Pet;
+use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use App\Http\Requests\StorePetRequest;
+use App\Http\Requests\UpdatePetRequest;
+use App\Http\Traits\ApiResponseTrait;
+use App\Http\Resources\PetResource;
 
 class PetController extends Controller
 {
+    use ApiResponseTrait; // Use Trait
+
     public function index(Request $request)
     {
         $pets = Pet::where('user_id', $request->user()->id)->get();
 
-        return response()->json([
-            'ok' => true,
-            'data' => $pets,
-        ]);
+        return $this->apiSuccess(PetResource::collection($pets));
     }
 
     public function store(StorePetRequest $request)
@@ -28,20 +29,14 @@ class PetController extends Controller
             'user_id' => $request->user()->id,
         ]);
 
-        return response()->json([
-            'ok' => true,
-            'data' => $pet,
-        ], 201);
+        return $this->apiSuccess(new PetResource($pet), 201);
     }
 
     public function show(Pet $pet)
     {
         $this->authorize('view', $pet);
 
-        return response()->json([
-            'ok' => true,
-            'data' => $pet,
-        ]);
+        return $this->apiSuccess(new PetResource($pet));
     }
 
     public function update(UpdatePetRequest $request, Pet $pet)
@@ -50,10 +45,7 @@ class PetController extends Controller
 
         $pet->update($request->validated());
 
-        return response()->json([
-            'ok' => true,
-            'data' => $pet,
-        ]);
+        return $this->apiSuccess(new PetResource($pet));
     }
 
     public function destroy(Pet $pet)
@@ -62,10 +54,7 @@ class PetController extends Controller
 
         $pet->delete();
 
-        return response()->json([
-            'ok' => true,
-            'message' => 'Pet deleted successfully',
-        ]);
+        return $this->apiSuccess(['message' => 'Pet deleted successfully']);
     }
 
     public function uploadPhoto(Request $request, Pet $pet)
@@ -84,11 +73,6 @@ class PetController extends Controller
 
         $pet->update(['photo_path' => $path]);
 
-        return response()->json([
-            'ok' => true,
-            'data' => [
-                'photo_url' => $pet->photo_url,
-            ],
-        ]);
+        return $this->apiSuccess(new PetResource($pet));
     }
 }

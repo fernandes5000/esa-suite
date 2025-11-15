@@ -11,15 +11,17 @@ class Index extends Component
 
     public function mount(ApiClient $client)
     {
-        $token = session('api_token');
+        $res = $client->get('/v1/pets');
 
-        $res = $client->withToken($token)->get('/api/v1/pets');
-
-        $this->pets = $res->json('data') ?? [];
+        if ($res['ok'] ?? false) {
+            $this->pets = $res['data'] ?? [];
+        } else {
+            $this->pets = [];
+        }
     }
 
     public function render()
     {
-        return view('pets.index');
+        return view('livewire.pets.index');
     }
 }
