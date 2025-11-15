@@ -66,6 +66,8 @@ services:
     env_file: ./web/.env
     volumes:
       - ./web:/var/www/html
+    ports:
+      - "5173:5173"
     depends_on:
       - mysql
       - redis
