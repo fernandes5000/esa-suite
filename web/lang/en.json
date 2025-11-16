@@ -38,5 +38,11 @@
     "Assign Roles": "Assign Roles",
     "Save Changes": "Save Changes",
     "User updated successfully!": "User updated successfully!",
-    "Admin Panel": "Admin Panel"
+    "Admin Panel": "Admin Panel",
+    "Register": "Register",
+    "Confirm Password": "Confirm Password",
+    "Already registered?": "Already registered?",
+    "Need an account?": "Need an account?",
+    "Registration failed.": "Registration failed.",
+    "Whoops! Something went wrong.": "Whoops! Something went wrong."
 }
