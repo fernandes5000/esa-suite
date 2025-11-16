@@ -49,9 +49,13 @@ class AuthController extends Controller
             ]);
         }
 
+        $roles = $user->getRoleNames();
+
         return $this->apiSuccess([
             'user' => $user,
             'token' => $user->createToken('api')->plainTextToken,
+            'roles' => $roles,
+            'user_id' => $user->id,
         ]);
     }
 

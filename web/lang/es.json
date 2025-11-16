@@ -21,5 +21,22 @@
     "Notes (optional)": "Notas (opcional)",
     "Save Pet": "Guardar Mascota",
     "Cancel": "Cancelar",
-    "Pet added successfully!": "¡Mascota agregada con éxito!"
+    "Pet added successfully!": "¡Mascota agregada con éxito!",
+    "Admin": "Admin",
+    "User Management": "Gestión de Usuarios",
+    "Failed to load users.": "Error al cargar usuarios.",
+    "Roles": "Roles",
+    "Actions": "Acciones",
+    "No users found.": "No se encontraron usuarios.",
+    "Unauthorized access.": "Acceso no autorizado.",
+    "Edit User": "Editar Usuario",
+    "User Information": "Información del Usuario",
+    "Password (optional)": "Contraseña (opcional)",
+    "Leave blank to keep unchanged": "Dejar en blanco para no cambiar",
+    "Account Status": "Estado de la Cuenta",
+    "User is Banned?": "¿Usuario Bloqueado?",
+    "Assign Roles": "Asignar Roles",
+    "Save Changes": "Guardar Cambios",
+    "User updated successfully!": "¡Usuario actualizado con éxito!",
+    "Admin Panel": "Panel de Admin"
 }

@@ -21,5 +21,22 @@
     "Notes (optional)": "Notas (opcional)",
     "Save Pet": "Salvar Pet",
     "Cancel": "Cancelar",
-    "Pet added successfully!": "Pet adicionado com sucesso!"
+    "Pet added successfully!": "Pet adicionado com sucesso!",
+    "Admin": "Admin",
+    "User Management": "Gerenciamento de Usuários",
+    "Failed to load users.": "Falha ao carregar usuários.",
+    "Roles": "Cargos",
+    "Actions": "Ações",
+    "No users found.": "Nenhum usuário encontrado.",
+    "Unauthorized access.": "Acesso não autorizado.",
+    "Edit User": "Editar Usuário",
+    "User Information": "Informações do Usuário",
+    "Password (optional)": "Senha (opcional)",
+    "Leave blank to keep unchanged": "Deixe em branco para não alterar",
+    "Account Status": "Status da Conta",
+    "User is Banned?": "Usuário Banido?",
+    "Assign Roles": "Atribuir Cargos",
+    "Save Changes": "Salvar Alterações",
+    "User updated successfully!": "Usuário atualizado com sucesso!",
+    "Admin Panel": "Painel Admin"
 }

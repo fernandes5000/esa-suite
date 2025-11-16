@@ -21,5 +21,22 @@
     "Notes (optional)": "Notes (optional)",
     "Save Pet": "Save Pet",
     "Cancel": "Cancel",
-    "Pet added successfully!": "Pet added successfully!"
+    "Pet added successfully!": "Pet added successfully!",
+    "Admin": "Admin",
+    "User Management": "User Management",
+    "Failed to load users.": "Failed to load users.",
+    "Roles": "Roles",
+    "Actions": "Actions",
+    "No users found.": "No users found.",
+    "Unauthorized access.": "Unauthorized access.",
+    "Edit User": "Edit User",
+    "User Information": "User Information",
+    "Password (optional)": "Password (optional)",
+    "Leave blank to keep unchanged": "Leave blank to keep unchanged",
+    "Account Status": "Account Status",
+    "User is Banned?": "User is Banned?",
+    "Assign Roles": "Assign Roles",
+    "Save Changes": "Save Changes",
+    "User updated successfully!": "User updated successfully!",
+    "Admin Panel": "Admin Panel"
 }

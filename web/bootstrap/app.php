@@ -14,6 +14,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'auth.web' => \App\Http\Middleware\WebAuth::class,
+            'admin'    => \App\Http\Middleware\CheckAdminRole::class,
         ]);
 
         $middleware->web(\App\Http\Middleware\SetLocale::class);

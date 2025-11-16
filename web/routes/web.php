@@ -19,3 +19,7 @@ Route::middleware('auth.web')->group(function () {
 
     Route::post('/logout', [LogoutController::class, 'logout'])->name('logout');
 });
+
+Route::middleware(['auth.web', 'admin'])->prefix('admin')->name('admin.')->group(function () {
+    Route::get('/users', \App\Livewire\Admin\Users\Index::class)->name('users.index');
+});
