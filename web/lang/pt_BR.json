@@ -38,5 +38,11 @@
     "Assign Roles": "Atribuir Cargos",
     "Save Changes": "Salvar Alterações",
     "User updated successfully!": "Usuário atualizado com sucesso!",
-    "Admin Panel": "Painel Admin"
+    "Admin Panel": "Painel Admin",
+    "Register": "Registrar-se",
+    "Confirm Password": "Confirmar Senha",
+    "Already registered?": "Já é registrado?",
+    "Need an account?": "Precisa de uma conta?",
+    "Registration failed.": "O registro falhou.",
+    "Whoops! Something went wrong.": "Opa! Algo deu errado."
 }

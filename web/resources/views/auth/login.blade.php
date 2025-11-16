@@ -20,8 +20,12 @@
         </div>
 
         <div class="flex items-center justify-end mt-4">
+            <a class="text-sm text-gray-600 hover:text-gray-900 underline" href="{{ route('register') }}">
+                {{ __('Need an account?') }}
+            </a>
+
             <button type="submit" 
-                    class="ml-4 inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-700 active:bg-blue-800 focus:outline-none focus:border-blue-800 focus:ring ring-blue-300 disabled:opacity-25 transition">
+                    class="ml-4 inline-flex items-center ...">
                 {{ __('Log in') }}
             </button>
         </div>

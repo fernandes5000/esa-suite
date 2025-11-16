@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use App\Http\Traits\ApiResponseTrait;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
+use Spatie\Permission\Models\Role;
 
 class AuthController extends Controller
 {
@@ -15,9 +16,9 @@ class AuthController extends Controller
     public function register(Request $request)
     {
         $data = $request->validate([
-            'name' => ['required'],
-            'email' => ['required','email','unique:users'],
-            'password' => ['required','min:6'],
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'string', 'email', 'max:255', 'unique:users'],
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
         ]);
 
         $user = User::create([
@@ -26,11 +27,19 @@ class AuthController extends Controller
             'password' => Hash::make($data['password']),
         ]);
 
+        $userRole = Role::where('name', 'user')->where('guard_name', 'sanctum')->first();
+        if ($userRole) {
+            $user->assignRole($userRole);
+        }
+
         $token = $user->createToken('api')->plainTextToken;
+        $roles = $user->getRoleNames();
 
         return $this->apiSuccess([
             'user' => $user,
             'token' => $token,
+            'roles' => $roles,
+            'user_id' => $user->id,
         ], 201);
     }
 
