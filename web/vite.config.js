@@ -11,7 +11,7 @@ export default defineConfig({
             host: 'localhost'
         },
         
-        origin: 'http://localhost:5173'
+        // origin: 'http://localhost:5173'
     },
     plugins: [
         laravel({

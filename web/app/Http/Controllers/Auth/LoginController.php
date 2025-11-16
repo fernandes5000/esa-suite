@@ -23,7 +23,6 @@ class LoginController extends Controller
         $api = new ApiClient();
         $response = $api->post('/v1/auth/login', $request->only('email','password'));
 
-
         if (!($response['ok'] ?? false)) {
             return back()->withErrors([
                 'email' => $response['error'] ?? 'Invalid credentials.',
@@ -32,7 +31,9 @@ class LoginController extends Controller
 
         session([
             'api_token' => $response['data']['token'],
-            'user_name' => $response['data']['user']['name']
+            'user_name' => $response['data']['user']['name'],
+            'roles'     => $response['data']['roles'],
+            'auth_id'   => $response['data']['user_id']
         ]);
 
         return redirect()->route('dashboard');

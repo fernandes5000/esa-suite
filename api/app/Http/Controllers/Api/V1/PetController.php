@@ -10,20 +10,24 @@ use App\Http\Requests\StorePetRequest;
 use App\Http\Requests\UpdatePetRequest;
 use App\Http\Traits\ApiResponseTrait;
 use App\Http\Resources\PetResource;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class PetController extends Controller
 {
-    use ApiResponseTrait; // Use Trait
+    use ApiResponseTrait, AuthorizesRequests;
 
     public function index(Request $request)
     {
-        $pets = Pet::where('user_id', $request->user()->id)->get();
+        $this->authorize('create', Pet::class);
 
+        $pets = Pet::where('user_id', $request->user()->id)->get();
         return $this->apiSuccess(PetResource::collection($pets));
     }
 
     public function store(StorePetRequest $request)
     {
+        $this->authorize('create', Pet::class);
+
         $pet = Pet::create([
             ...$request->validated(),
             'user_id' => $request->user()->id,
@@ -35,25 +39,20 @@ class PetController extends Controller
     public function show(Pet $pet)
     {
         $this->authorize('view', $pet);
-
         return $this->apiSuccess(new PetResource($pet));
     }
 
     public function update(UpdatePetRequest $request, Pet $pet)
     {
         $this->authorize('update', $pet);
-
         $pet->update($request->validated());
-
         return $this->apiSuccess(new PetResource($pet));
     }
 
     public function destroy(Pet $pet)
     {
         $this->authorize('delete', $pet);
-
         $pet->delete();
-
         return $this->apiSuccess(['message' => 'Pet deleted successfully']);
     }
 
