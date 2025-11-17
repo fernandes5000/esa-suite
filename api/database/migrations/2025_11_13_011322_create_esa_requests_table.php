@@ -9,13 +9,15 @@ return new class extends Migration {
         Schema::create('esa_requests', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('pet_id')->constrained()->cascadeOnDelete();
-            $table->text('reason');
-            $table->enum('status', ['pending','approved','rejected'])->default('pending');
+            $table->unsignedTinyInteger('wizard_step')->default(1);
+            $table->string('certificate_name')->nullable();
+            $table->json('problem_checkboxes')->nullable();
+            $table->text('description')->nullable();
+            $table->timestamp('terms_accepted_at')->nullable();
+            $table->enum('status', ['draft', 'pending', 'reviewing', 'approved', 'rejected'])->default('draft');
             $table->unsignedInteger('fee_cents')->default(9900);
             $table->timestamps();
-
-            $table->index(['status','created_at']);
+            $table->index(['user_id', 'status']);
         });
     }
 

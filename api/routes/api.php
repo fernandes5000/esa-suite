@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\Api\V1\PetController;
 use App\Http\Controllers\Api\V1\Admin\UserController as AdminUserController;
+use App\Http\Controllers\Api\V1\EsaRequestController;
 
 /*
 |--------------------------------------------------------------------------
@@ -29,6 +30,15 @@ Route::prefix('v1')->group(function () {
         Route::post('/auth/logout', [AuthController::class, 'logout']);
         
         Route::post('/pets/{pet}/photo', [PetController::class, 'uploadPhoto']);
+
+        Route::get('/esa-request/active', [EsaRequestController::class, 'getActiveOrCreateRequest'])
+             ->name('esa-request.active');
+
+        Route::put('/esa-request/{esaRequest}', [EsaRequestController::class, 'update'])
+             ->name('esa-request.update');
+
+        Route::post('/esa-request/{esaRequest}/pets', [EsaRequestController::class, 'syncPets'])
+             ->name('esa-request.sync-pets');
         
         Route::apiResource('/pets', PetController::class);
 
