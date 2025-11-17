@@ -16,7 +16,7 @@ Route::get('/register', [RegisterController::class, 'show'])->name('register');
 Route::post('/register', [RegisterController::class, 'register'])->name('register.submit');
 
 Route::middleware('auth.web')->group(function () {
-    Route::view('/dashboard', 'dashboard')->name('dashboard');
+    Route::get('/dashboard', \App\Livewire\Dashboard::class)->name('dashboard');
 
     Route::get('/pets', \App\Livewire\Pets\Index::class)->name('pets.index');
 
