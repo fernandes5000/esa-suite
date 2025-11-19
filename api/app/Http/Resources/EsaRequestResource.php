@@ -7,9 +7,6 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 class EsaRequestResource extends JsonResource
 {
-    /**
-     * Transform the resource into an array.
-     */
     public function toArray(Request $request): array
     {
         return [
@@ -21,7 +18,25 @@ class EsaRequestResource extends JsonResource
             'terms_accepted_at' => $this->terms_accepted_at,
             'status' => $this->status,
             'fee_cents' => $this->fee_cents,
-            'pets' => PetResource::collection($this->whenLoaded('pets')),
+            'created_at' => $this->created_at->toIso8601String(),
+            'pets' => $this->whenLoaded('pets', function () {
+                return $this->pets->map(function ($pet) {
+                    return [
+                        'id' => $pet->id,
+                        'name' => $pet->name,
+                        'type' => $pet->type,
+                        'breed' => $pet->breed,
+                        'age' => $pet->age,
+                    ];
+                });
+            }),
+            'user' => $this->whenLoaded('user', function () {
+                return [
+                    'id' => $this->user->id,
+                    'name' => $this->user->name,
+                    'email' => $this->user->email,
+                ];
+            }),
         ];
     }
 }
