@@ -1,89 +1,83 @@
 services:
-  
-  # 1. Laravel + Livewire
-  esa-web-app:
-    build:
-      context: ./web
-      dockerfile: Dockerfile
-    container_name: ${PROJECT_NAME}_web_app
-    restart: unless-stopped
-    working_dir: /var/www
-    volumes:
-      - ./web:/var/www
-      - ./web/storage/logs:/var/www/storage/logs
-    networks:
-      - esa-network
-    depends_on:
-      - esa-api-app
-
-  # 2. Nginx
-  esa-web-nginx:
-    image: nginx:1.19-alpine
-    container_name: ${PROJECT_NAME}_web_nginx
-    restart: unless-stopped
-    ports:
-      - "${WEB_PORT:-8080}:80"
-    volumes:
-      - ./web:/var/www
-      - ./nginx/web/conf.d:/etc/nginx/conf.d
-    networks:
-      - esa-network
-    depends_on:
-      - esa-web-app
-
-  # 3. API Laravel
-  esa-api-app:
-    build:
-      context: ./api
-      dockerfile: Dockerfile
-    container_name: ${PROJECT_NAME}_api_app
-    restart: unless-stopped
-    working_dir: /var/www
-    volumes:
-      - ./api:/var/www
-      - ./api/storage/logs:/var/www/storage/logs
-      - ./api/storage/app/public:/var/www/storage/app/public # PDFs
-    networks:
-      - esa-network
-    depends_on:
-      - esa-db
-
-  # 4. Nginx API
-  esa-api-nginx:
-    image: nginx:1.19-alpine
-    container_name: ${PROJECT_NAME}_api_nginx
-    restart: unless-stopped
-    volumes:
-      - ./api:/var/www
-      - ./nginx/api/conf.d:/etc/nginx/conf.d
-    networks:
-      - esa-network
-    depends_on:
-      - esa-api-app
-
-  # 5. MySQL
-  esa-db:
+  mysql:
     image: mysql:8.0
-    container_name: ${PROJECT_NAME}_db
+    container_name: ${PROJECT_NAME}_mysql
     restart: unless-stopped
-    ports:
-      - "${DB_PORT:-3306}:3306"
     environment:
       MYSQL_DATABASE: ${DB_DATABASE}
       MYSQL_USER: ${DB_USERNAME}
       MYSQL_PASSWORD: ${DB_PASSWORD}
       MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+    ports:
+      - "${DB_PORT:-3306}:3306"
     volumes:
-      - ${DB_VOLUME_NAME:-esa-db-data}:/var/lib/mysql
+      - ${DB_VOLUME_NAME:-mysql_data}:/var/lib/mysql
     networks:
       - esa-network
+
+  api-app:
+    build:
+      context: ./api
+      dockerfile: ../docker/php/api.Dockerfile
+    container_name: ${PROJECT_NAME}_api_app
+    restart: unless-stopped
+    env_file: ./api/.env
+    volumes:
+      - ./api:/var/www/html
+    networks:
+      - esa-network
+    depends_on:
+      - mysql
+    command: bash -lc "php-fpm"
+
+  api-nginx:
+    image: nginx:1.25
+    container_name: ${PROJECT_NAME}_api_nginx
+    restart: unless-stopped
+    volumes:
+      - ./api:/var/www/html
+      - ./docker/nginx/api.conf:/etc/nginx/conf.d/default.conf
+    networks:
+      - esa-network
+    depends_on:
+      - api-app
+
+  web-app:
+    build:
+      context: ./web
+      dockerfile: ../docker/php/web.Dockerfile
+    container_name: ${PROJECT_NAME}_web_app
+    restart: unless-stopped
+    env_file: ./web/.env
+    volumes:
+      - ./web:/var/www/html
+    networks:
+      - esa-network
+    depends_on:
+      - mysql
+      - api-nginx
+    command: bash -lc "php-fpm"
+
+  web-nginx:
+    image: nginx:1.25
+    container_name: ${PROJECT_NAME}_web_nginx
+    restart: unless-stopped
+    volumes:
+      - ./web:/var/www/html
+      - ./docker/nginx/web.conf:/etc/nginx/conf.d/default.conf
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    networks:
+      - esa-network
+    depends_on:
+      - web-app
 
 networks:
   esa-network:
     driver: bridge
 
 volumes:
-  esa-db-data:
+  mysql_data:
   esa-db-dev:
   esa-db-stage:
   esa-db-prod:
