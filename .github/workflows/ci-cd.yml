@@ -5,7 +5,7 @@ on:
     branches:
       - main    # Production
       - staging # Staging
-      - dev     # DDev
+      - dev     # Dev
 
 jobs:
   deploy:
