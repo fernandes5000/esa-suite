@@ -21,7 +21,6 @@ services:
       dockerfile: ../docker/php/api.Dockerfile
     container_name: ${PROJECT_NAME}_api_app
     restart: unless-stopped
-    env_file: ./api/.env
     volumes:
       - ./api:/var/www/html
     networks:
@@ -48,7 +47,6 @@ services:
       dockerfile: ../docker/php/web.Dockerfile
     container_name: ${PROJECT_NAME}_web_app
     restart: unless-stopped
-    env_file: ./web/.env
     volumes:
       - ./web:/var/www/html
     networks:
@@ -64,7 +62,7 @@ services:
     restart: unless-stopped
     volumes:
       - ./web:/var/www/html
-      - ./docker/nginx/web.conf:/etc/nginx/conf.d/default.conf
+      - ./docker/nginx/web.conf:/etc/nginx/conf.d/default.conf # Caminho CORRETO
     ports:
       - "${WEB_PORT:-8080}:80"
     networks:
