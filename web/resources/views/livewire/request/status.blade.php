@@ -31,11 +31,13 @@
                 <p>{{ __('Your request is currently being reviewed by a licensed professional.') }}</p>
                 @break
             @case('approved')
-                <p>{{ __('Congratulations! Your request has been approved.') }}</p>
-                <button class="mt-4 px-4 py-2 bg-green-600 text-white rounded-md shadow-sm">
-                    Download Documents
+                <p class="mb-4">{{ __('Congratulations! Your request has been approved.') }}</p>
+                
+                <button onclick="window.open('{{ config('services.api.public_url') }}/v1/esa-request/{{ $requestData['id'] }}/download?token={{ session('api_token') }}', '_blank')"
+                        class="mt-4 px-4 py-2 bg-green-600 text-white rounded-md shadow-sm hover:bg-green-700 transition">
+                    Download Certificate (PDF)
                 </button>
-                @break
+            @break
             @case('rejected')
                 <p>{{ __('We are sorry, your request was not approved.') }}</p>
                 @break

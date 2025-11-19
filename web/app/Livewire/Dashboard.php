@@ -11,6 +11,7 @@ class Dashboard extends Component
     public ?array $activeRequest = null;
     public string $viewMode = '';
 
+    #[On('applicationSubmitted')]
     public function refreshData(ApiClient $client)
     {
         $res = $client->get('/v1/esa-request/active');
@@ -36,6 +37,11 @@ class Dashboard extends Component
 
     public function mount(ApiClient $client)
     {
+        if (in_array('therapist', session('roles', []))) {
+            $this->viewMode = 'therapist_queue';
+            return;
+        }
+
         $this->refreshData($client);
     }
 

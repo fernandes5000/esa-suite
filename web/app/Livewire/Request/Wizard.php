@@ -11,6 +11,7 @@ class Wizard extends Component
     public array $requestData;
     public int $step;
 
+    // --- Form Properties ---
     public string $certificate_name = '';
     public array $userPets = [];
     public array $problem_checkboxes = [];
@@ -21,6 +22,7 @@ class Wizard extends Component
         'Anxiety', 'Depression', 'Stress', 'Panic Attacks', 'Social Phobia', 'Other'
     ];
 
+    // Modal Add Pet
     public bool $showingAddPetModal = false;
     public string $pet_name = '';
     public string $pet_type = 'Dog';
@@ -28,6 +30,7 @@ class Wizard extends Component
     public ?int $pet_age = null;
     public ?string $pet_notes = null;
     
+    // Modal Edit Pet
     public bool $showingEditPetModal = false;
     public ?int $editingPetId = null;
     public string $edit_pet_name = '';
@@ -40,25 +43,17 @@ class Wizard extends Component
     public ?int $deletingPetId = null;
     public string $deletingPetName = '';
 
-
     public function mount(array $requestData)
     {
         $this->requestData = $requestData;
         $this->step = $this->requestData['wizard_step'] ?? 1;
+
         $this->certificate_name = $this->requestData['certificate_name'] 
                                 ?? session('user_name', '');
         $this->problem_checkboxes = $this->requestData['problem_checkboxes'] ?? [];
         $this->description = $this->requestData['description'] ?? '';
+        
         $this->terms_accepted = false;
-    }
-
-    public function updatedSelectedPetIds($value)
-    {
-        $client = app(ApiClient::class); 
-        $integerIDs = array_map('intval', (array) $value); 
-        $client->post("/v1/esa-request/{$this->requestData['id']}/pets", [
-            'pet_ids' => $integerIDs
-        ]);
     }
 
     public function loadUserPets(ApiClient $client)
@@ -91,14 +86,19 @@ class Wizard extends Component
         }
     }
     
+    /**
+     * Returns ONLY the payload for the Livewire PUT.
+     */
     protected function collectStepData(ApiClient $client): array
     {
         if ($this->step == 2) {
             return ['certificate_name' => $this->certificate_name];
         }
+        
         if ($this->step == 3) {
             return [];
         }
+
         if ($this->step == 4) {
             return ['problem_checkboxes' => $this->problem_checkboxes];
         }
@@ -114,9 +114,21 @@ class Wizard extends Component
         return [];
     }
 
-    public function saveAndContinue(ApiClient $client)
+    public function saveAndContinue()
     {
+        $client = app(ApiClient::class);
+
         $this->validateStep();
+
+        if ($this->step == 3) {
+            $this->loadUserPets($client);
+            $allPetIds = array_column($this->userPets, 'id');
+            
+            $client->authedPost("/v1/esa-request/{$this->requestData['id']}/pets", [
+                'pet_ids' => $allPetIds
+            ]);
+        }
+        
         $stepData = $this->collectStepData($client);
 
         if ($this->step != 6) {
@@ -126,21 +138,23 @@ class Wizard extends Component
         $res = $client->put("/v1/esa-request/{$this->requestData['id']}", $stepData);
         
         if (!($res['ok'] ?? false)) {
-            session()->flash('error', $res['error'] ?? 'Failed to save progress.');
+            session()->flash('error', $res['error'] ?? 'Failed to save progress..');
             return;
         }
 
         $this->requestData = $res['data'];
         
         if ($this->step == 6) {
-            $this->dispatch('refreshDashboard')->to(Dashboard::class);
+            return $this->redirect(route('dashboard'), navigate: true); 
         } else {
             $this->step++;
         }
     }
     
-    public function previousStep(ApiClient $client)
+    public function previousStep()
     {
+        $client = app(ApiClient::class);
+
         if ($this->step > 1) {
             $this->step--;
             
@@ -150,6 +164,7 @@ class Wizard extends Component
         }
     }
 
+    // --- Pet Validation Rules ---
     protected function petRules(): array
     {
         return [
@@ -163,8 +178,8 @@ class Wizard extends Component
     protected function validationAttributes(): array
     {
         return [
-            'pet_name' => 'name', 'pet_type' => 'type',
-            'edit_pet_name' => 'name', 'edit_pet_type' => 'type',
+            'pet_name' => 'nome', 'pet_type' => 'tipo',
+            'edit_pet_name' => 'nome', 'edit_pet_type' => 'tipo',
         ];
     }
     
@@ -175,8 +190,10 @@ class Wizard extends Component
         $this->showingAddPetModal = true;
     }
     public function closeAddPetModal() { $this->showingAddPetModal = false; }
-    public function savePet(ApiClient $client)
+
+    public function savePet()
     {
+        $client = app(ApiClient::class);
         $validatedData = $this->validate($this->petRules());
         $petData = [
             'name' => $validatedData['pet_name'], 'type' => $validatedData['pet_type'],
@@ -185,18 +202,20 @@ class Wizard extends Component
         ];
         $res = $client->authedPost('/v1/pets', $petData);
         if (!($res['ok'] ?? false)) {
-            session()->flash('error', $res['error'] ?? 'Could not save pet.');
+            session()->flash('error', $res['error'] ?? 'Não foi possível salvar o pet.');
             return;
         }
         $this->loadUserPets($client);
         $this->closeAddPetModal();
     }
 
-    public function openEditPetModal(int $petId, ApiClient $client)
+    public function openEditPetModal(int $petId)
     {
+        $client = app(ApiClient::class);
         $pet = $client->get("/v1/pets/{$petId}");
+        
         if (!($pet['ok'] ?? false)) {
-            session()->flash('error', $pet['error'] ?? 'Could not load pet data.');
+            session()->flash('error', $pet['error'] ?? "We were unable to load the pet's data.");
             return;
         }
         $petData = $pet['data'];
@@ -212,8 +231,10 @@ class Wizard extends Component
         $this->showingEditPetModal = true;
     }
     public function closeEditPetModal() { $this->showingEditPetModal = false; }
-    public function updatePet(ApiClient $client)
+    
+    public function updatePet()
     {
+        $client = app(ApiClient::class);
         $this->pet_name = $this->edit_pet_name;
         $this->pet_type = $this->edit_pet_type;
         $this->pet_breed = $this->edit_pet_breed;
@@ -231,7 +252,7 @@ class Wizard extends Component
         ]);
 
         if (!($res['ok'] ?? false)) {
-            session()->flash('error', $res['error'] ?? 'Could not update pet.');
+            session()->flash('error', $res['error'] ?? 'It was not possible to update the pet.');
             return;
         }
         
@@ -247,12 +268,14 @@ class Wizard extends Component
         $this->showingDeletePetModal = true;
     }
     public function closeDeletePetModal() { $this->showingDeletePetModal = false; }
-    public function deletePet(ApiClient $client)
+    
+    public function deletePet()
     {
+        $client = app(ApiClient::class);
         $res = $client->delete("/v1/pets/{$this->deletingPetId}");
 
         if (!($res['ok'] ?? false)) {
-            session()->flash('error', $res['error'] ?? 'Could not delete pet.');
+            session()->flash('error', $res['error'] ?? 'It was not possible to delete the pet.');
             return;
         }
         

@@ -61,20 +61,13 @@ class EsaRequestController extends Controller
         return $this->apiSuccess(new EsaRequestResource($esaRequest));
     }
 
-    public function syncPets(Request $request, EsaRequest $esaRequest)
+    public function syncPets(EsaRequest $esaRequest, Request $request)
     {
-        $this->authorize('update', $esaRequest);
+        $petIds = $request->input('pet_ids', []);
         
-        $user = $request->user(); 
+        $esaRequest->pets()->sync($petIds); 
 
-        $validated = $request->validate([
-            'pet_ids' => ['required', 'array'],
-            'pet_ids.*' => ['numeric', Rule::exists('pets', 'id')->where('user_id', $user->id)],
-        ]);
-
-        $esaRequest->pets()->sync($validated['pet_ids']);
         $esaRequest->load('pets');
-
         return $this->apiSuccess(new EsaRequestResource($esaRequest));
     }
 }
