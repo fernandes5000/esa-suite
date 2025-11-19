@@ -1,0 +1,74 @@
+name: Deploy ESA Project
+
+on:
+  push:
+    branches:
+      - main    # Production
+      - staging # Staging
+      - dev     # DDev
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    environment:
+      name: ${{ (github.ref == 'refs/heads/main' && 'production') || (github.ref == 'refs/heads/staging' && 'staging') || 'development' }}
+
+    steps:
+      - name: 1. Defining Environment Variables
+        id: vars
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            echo "BRANCH=main" >> $GITHUB_ENV
+            echo "DIR_PATH=/home/deployer/esa-prod" >> $GITHUB_ENV
+            echo "ENV_CONTENT=${{ secrets.ENV_PROD }}" >> $GITHUB_ENV
+            echo "CONTAINER_WEB=esa_prod_web_app" >> $GITHUB_ENV
+            echo "CONTAINER_API=esa_prod_api_app" >> $GITHUB_ENV
+          elif [[ "${{ github.ref }}" == "refs/heads/staging" ]]; then
+            echo "BRANCH=staging" >> $GITHUB_ENV
+            echo "DIR_PATH=/home/deployer/esa-stage" >> $GITHUB_ENV
+            echo "ENV_CONTENT=${{ secrets.ENV_STAGE }}" >> $GITHUB_ENV
+            echo "CONTAINER_WEB=esa_stage_web_app" >> $GITHUB_ENV
+            echo "CONTAINER_API=esa_stage_api_app" >> $GITHUB_ENV
+          elif [[ "${{ github.ref }}" == "refs/heads/dev" ]]; then
+            echo "BRANCH=dev" >> $GITHUB_ENV
+            echo "DIR_PATH=/home/deployer/esa-dev" >> $GITHUB_ENV
+            echo "ENV_CONTENT=${{ secrets.ENV_DEV }}" >> $GITHUB_ENV
+            echo "CONTAINER_WEB=esa_dev_web_app" >> $GITHUB_ENV
+            echo "CONTAINER_API=esa_dev_api_app" >> $GITHUB_ENV
+          fi
+
+      - name: 2. Setting up SSH
+        uses: webfactory/ssh-agent@v0.5.3
+        with:
+          ssh-private-key: ${{ secrets.SERVER_SSH_KEY }}
+
+      - name: 3. Connecting and Deploying
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
+            # 1. Clone the repository if it doesn't exist, otherwise pull it.
+            if [ ! -d "${{ env.DIR_PATH }}" ]; then
+              git clone https://github.com/${{ github.repository }}.git "${{ env.DIR_PATH }}"
+            fi
+            cd "${{ env.DIR_PATH }}"
+            git checkout "${{ env.BRANCH }}"
+            git pull origin "${{ env.BRANCH }}"
+            
+            # 2. Creates the .env file from the GitHub Secret.
+            echo "${{ env.ENV_CONTENT }}" > .env
+            
+            # 3. Lift the containers
+            docker compose up -d --build --remove-orphans
+            
+            # 4. Clear caches and run migrations.
+            docker compose exec -T "${{ env.CONTAINER_WEB }}" php artisan config:cache
+            docker compose exec -T "${{ env.CONTAINER_WEB }}" php artisan route:cache
+            docker compose exec -T "${{ env.CONTAINER_WEB }}" php artisan view:cache
+            
+            docker compose exec -T "${{ env.CONTAINER_API }}" php artisan config:cache
+            docker compose exec -T "${{ env.CONTAINER_API }}" php artisan route:cache
+            docker compose exec -T "${{ env.CONTAINER_API }}" php artisan migrate --force
+            
+            # 5. Clean old containers
+            docker image prune -af
+          EOF
