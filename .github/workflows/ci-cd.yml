@@ -67,22 +67,29 @@ jobs:
             echo "--- Creating .env file ---"
             echo "${{ env.ENV_CONTENT }}" > .env
             
-            # 3. Start Containers (Build will install dependencies now!)
-            echo "--- Starting Docker Containers & Building ---"
-            docker compose up -d --build --remove-orphans
+            # 3. Stop Old Containers (Clean Slate)
+            echo "--- Stopping Old Containers ---"
+            # We explicitly use `-f docker-compose.yml` to ensure that it doesn't read overrides.
+            docker compose -f docker-compose.yml down --remove-orphans
             
-            # 4. Run Laravel Optimizations (Only config/route cache needed)
+            # 4. Build and Start Containers
+            echo "--- Building and Starting Containers ---"
+            # --build forces the recreation of the images with the new Dockerfiles.
+            docker compose -f docker-compose.yml up -d --build
+            
+            # 5. Laravel Optimizations (WEB)
             echo "--- Running Laravel Commands (WEB) ---"
-            docker compose exec -T "${{ env.CONTAINER_WEB }}" php artisan config:cache
-            docker compose exec -T "${{ env.CONTAINER_WEB }}" php artisan route:cache
-            docker compose exec -T "${{ env.CONTAINER_WEB }}" php artisan view:cache
+            docker compose -f docker-compose.yml exec -T "${{ env.CONTAINER_WEB }}" php artisan config:cache
+            docker compose -f docker-compose.yml exec -T "${{ env.CONTAINER_WEB }}" php artisan route:cache
+            docker compose -f docker-compose.yml exec -T "${{ env.CONTAINER_WEB }}" php artisan view:cache
             
+            # 6. Laravel Optimizations (API)
             echo "--- Running Laravel Commands (API) ---"
-            docker compose exec -T "${{ env.CONTAINER_API }}" php artisan config:cache
-            docker compose exec -T "${{ env.CONTAINER_API }}" php artisan route:cache
-            docker compose exec -T "${{ env.CONTAINER_API }}" php artisan migrate --force
+            docker compose -f docker-compose.yml exec -T "${{ env.CONTAINER_API }}" php artisan config:cache
+            docker compose -f docker-compose.yml exec -T "${{ env.CONTAINER_API }}" php artisan route:cache
+            docker compose -f docker-compose.yml exec -T "${{ env.CONTAINER_API }}" php artisan migrate --force
             
-            # 5. Cleanup
+            # 7. Cleanup
             echo "--- Cleaning up ---"
             docker image prune -af
             
