@@ -11,7 +11,6 @@ class Wizard extends Component
     public array $requestData;
     public int $step;
 
-    // --- Form Properties ---
     public string $certificate_name = '';
     public array $userPets = [];
     public array $problem_checkboxes = [];
@@ -22,7 +21,6 @@ class Wizard extends Component
         'Anxiety', 'Depression', 'Stress', 'Panic Attacks', 'Social Phobia', 'Other'
     ];
 
-    // Modal Add Pet
     public bool $showingAddPetModal = false;
     public string $pet_name = '';
     public string $pet_type = 'Dog';
@@ -30,7 +28,6 @@ class Wizard extends Component
     public ?int $pet_age = null;
     public ?string $pet_notes = null;
     
-    // Modal Edit Pet
     public bool $showingEditPetModal = false;
     public ?int $editingPetId = null;
     public string $edit_pet_name = '';
@@ -86,9 +83,6 @@ class Wizard extends Component
         }
     }
     
-    /**
-     * Returns ONLY the payload for the Livewire PUT.
-     */
     protected function collectStepData(ApiClient $client): array
     {
         if ($this->step == 2) {
@@ -96,7 +90,7 @@ class Wizard extends Component
         }
         
         if ($this->step == 3) {
-            return [];
+            return []; 
         }
 
         if ($this->step == 4) {
@@ -138,7 +132,7 @@ class Wizard extends Component
         $res = $client->put("/v1/esa-request/{$this->requestData['id']}", $stepData);
         
         if (!($res['ok'] ?? false)) {
-            session()->flash('error', $res['error'] ?? 'Failed to save progress..');
+            session()->flash('error', $res['error'] ?? 'Failed to save progress.');
             return;
         }
 
@@ -164,7 +158,6 @@ class Wizard extends Component
         }
     }
 
-    // --- Pet Validation Rules ---
     protected function petRules(): array
     {
         return [
@@ -202,7 +195,7 @@ class Wizard extends Component
         ];
         $res = $client->authedPost('/v1/pets', $petData);
         if (!($res['ok'] ?? false)) {
-            session()->flash('error', $res['error'] ?? 'Não foi possível salvar o pet.');
+            session()->flash('error', $res['error'] ?? 'It was not possible to save the pet.');
             return;
         }
         $this->loadUserPets($client);
@@ -252,7 +245,7 @@ class Wizard extends Component
         ]);
 
         if (!($res['ok'] ?? false)) {
-            session()->flash('error', $res['error'] ?? 'It was not possible to update the pet.');
+            session()->flash('error', $res['error'] ?? 'It was not possible to update the pet..');
             return;
         }
         
@@ -275,7 +268,7 @@ class Wizard extends Component
         $res = $client->delete("/v1/pets/{$this->deletingPetId}");
 
         if (!($res['ok'] ?? false)) {
-            session()->flash('error', $res['error'] ?? 'It was not possible to delete the pet.');
+            session()->flash('error', $res['error'] ?? 'It was not possible to delete the pet..');
             return;
         }
         
