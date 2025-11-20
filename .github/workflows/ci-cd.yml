@@ -1,96 +1,114 @@
 name: Deploy ESA Project
 
-# This workflow triggers on a push event to any of the specified branches
 on:
   push:
     branches:
-      - main    # Production branch
-      - staging # Staging branch
-      - dev     # Development branch
+      - main    # Production
+      - staging # Staging
+      - dev     # Development
 
 jobs:
   deploy:
-    # The type of virtual machine to run the job on
     runs-on: ubuntu-latest
     
-    # Sets the GitHub Environment (for secrets and protection rules)
     environment:
       name: ${{ (github.ref == 'refs/heads/main' && 'production') || (github.ref == 'refs/heads/staging' && 'staging') || 'development' }}
 
     steps:
-      # Step 1: Define environment variables based on the branch being pushed
+      # Step 1: Define variables
       - name: 1. Defining Environment Variables
         id: vars
         run: |
           if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
             echo "BRANCH=main" >> $GITHUB_ENV
             echo "DIR_PATH=/home/deployer/esa-prod" >> $GITHUB_ENV
-            # FIX: Use Heredoc syntax for multi-line secrets
+            echo "CONTAINER_WEB=esa_prod_web_app" >> $GITHUB_ENV
+            echo "CONTAINER_API=esa_prod_api_app" >> $GITHUB_ENV
+            
             echo 'ENV_CONTENT<<EOF' >> $GITHUB_ENV
             echo '${{ secrets.ENV_PROD }}' >> $GITHUB_ENV
             echo 'EOF' >> $GITHUB_ENV
-            echo "CONTAINER_WEB=esa_prod_web_app" >> $GITHUB_ENV
-            echo "CONTAINER_API=esa_prod_api_app" >> $GITHUB_ENV
+            
           elif [[ "${{ github.ref }}" == "refs/heads/staging" ]]; then
             echo "BRANCH=staging" >> $GITHUB_ENV
             echo "DIR_PATH=/home/deployer/esa-stage" >> $GITHUB_ENV
-            # FIX: Use Heredoc syntax for multi-line secrets
+            echo "CONTAINER_WEB=esa_stage_web_app" >> $GITHUB_ENV
+            echo "CONTAINER_API=esa_stage_api_app" >> $GITHUB_ENV
+
             echo 'ENV_CONTENT<<EOF' >> $GITHUB_ENV
             echo '${{ secrets.ENV_STAGE }}' >> $GITHUB_ENV
             echo 'EOF' >> $GITHUB_ENV
-            echo "CONTAINER_WEB=esa_stage_web_app" >> $GITHUB_ENV
-            echo "CONTAINER_API=esa_stage_api_app" >> $GITHUB_ENV
+
           elif [[ "${{ github.ref }}" == "refs/heads/dev" ]]; then
             echo "BRANCH=dev" >> $GITHUB_ENV
             echo "DIR_PATH=/home/deployer/esa-dev" >> $GITHUB_ENV
-            # FIX: Use Heredoc syntax for multi-line secrets
+            echo "CONTAINER_WEB=esa_dev_web_app" >> $GITHUB_ENV
+            echo "CONTAINER_API=esa_dev_api_app" >> $GITHUB_ENV
+
             echo 'ENV_CONTENT<<EOF' >> $GITHUB_ENV
             echo '${{ secrets.ENV_DEV }}' >> $GITHUB_ENV
             echo 'EOF' >> $GITHUB_ENV
-            echo "CONTAINER_WEB=esa_dev_web_app" >> $GITHUB_ENV
-            echo "CONTAINER_API=esa_dev_api_app" >> $GITHUB_ENV
           fi
 
-      # Step 2: Set up the SSH agent with the private key from GitHub Secrets
+      # Step 2: Setup SSH
       - name: 2. Setting up SSH
         uses: webfactory/ssh-agent@v0.5.3
         with:
           ssh-private-key: ${{ secrets.SERVER_SSH_KEY }}
 
-      # Step 3: Connect to the server via SSH and run the deploy script
+      # Step 3: Deploy
       - name: 3. Connecting and Deploying
         run: |
-          # Use a Heredoc (<< 'EOF') to send multiple commands to the server
           ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
             
-            # 1. Navigate to the project directory.
-            # If it doesn't exist, clone it. If it does, pull the latest changes.
+            # 1. Clone or Pull
             if [ ! -d "${{ env.DIR_PATH }}" ]; then
+              echo "--- Cloning Repository ---"
               git clone https://github.com/${{ github.repository }}.git "${{ env.DIR_PATH }}"
             fi
             cd "${{ env.DIR_PATH }}"
+            echo "--- Pulling latest changes ---"
             git checkout "${{ env.BRANCH }}"
             git pull origin "${{ env.BRANCH }}"
             
-            # 2. Create the .env file from the multi-line GitHub Secret
+            # 2. Create .env file
+            echo "--- Creating .env file ---"
             echo "${{ env.ENV_CONTENT }}" > .env
             
-            # 3. Build and start the Docker containers
-            # --build: Rebuilds images if Dockerfile changed
-            # --remove-orphans: Removes old containers
+            # 3. Start Containers
+            echo "--- Starting Docker Containers ---"
             docker compose up -d --build --remove-orphans
             
-            # 4. Run Laravel optimization commands inside the containers
-            # -T flag disables pseudo-tty allocation, required for non-interactive exec
+            # 4. Install Dependencies (THE FIX)
+            echo "--- Installing PHP Dependencies (WEB) ---"
+            docker compose exec -T "${{ env.CONTAINER_WEB }}" composer install --no-dev --optimize-autoloader
+            
+            echo "--- Installing JS Dependencies (WEB) ---"
+            docker compose exec -T "${{ env.CONTAINER_WEB }}" npm install
+            docker compose exec -T "${{ env.CONTAINER_WEB }}" npm run build
+            
+            echo "--- Installing PHP Dependencies (API) ---"
+            docker compose exec -T "${{ env.CONTAINER_API }}" composer install --no-dev --optimize-autoloader
+            
+            # 5. Fix Permissions
+            echo "--- Fixing Permissions ---"
+            docker compose exec -T "${{ env.CONTAINER_WEB }}" chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
+            docker compose exec -T "${{ env.CONTAINER_API }}" chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
+            
+            # 6. Laravel Commands
+            echo "--- Running Laravel Commands (WEB) ---"
             docker compose exec -T "${{ env.CONTAINER_WEB }}" php artisan config:cache
             docker compose exec -T "${{ env.CONTAINER_WEB }}" php artisan route:cache
             docker compose exec -T "${{ env.CONTAINER_WEB }}" php artisan view:cache
             
+            echo "--- Running Laravel Commands (API) ---"
             docker compose exec -T "${{ env.CONTAINER_API }}" php artisan config:cache
             docker compose exec -T "${{ env.CONTAINER_API }}" php artisan route:cache
-            # --force: Required for running migrations in production without prompts
             docker compose exec -T "${{ env.CONTAINER_API }}" php artisan migrate --force
             
-            # 5. Clean up unused Docker images to save disk space
+            # 7. Cleanup
+            echo "--- Cleaning up ---"
             docker image prune -af
+            
+            echo "--- DEPLOY SUCCESSFUL ---"
           EOF
