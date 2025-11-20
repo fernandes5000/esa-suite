@@ -3,6 +3,9 @@
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Spatie\Permission\Middleware\PermissionMiddleware;
+use App\Http\Middleware\ForceTokenFromQuery;
+use Illuminate\Http\Request;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -13,13 +16,15 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
-            'permission' => \Spatie\Permission\Middleware\PermissionMiddleware::class,
-            'token.query' => \App\Http\Middleware\ForceTokenFromQuery::class,
+            'permission' => PermissionMiddleware::class,
+            'token.query' => ForceTokenFromQuery::class,
         ]);
 
         $middleware->api(prepend: [
-            \App\Http\Middleware\ForceTokenFromQuery::class,
+            ForceTokenFromQuery::class,
         ]);
+
+        $middleware->trustProxies(at: '*');
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //
