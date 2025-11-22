@@ -1,27 +1,31 @@
-FROM php:8.3-fpm-alpine
+FROM php:8.2-fpm
 
-RUN apk add --no-cache \
-    nginx \
-    supervisor \
-    libzip-dev \
+RUN apt-get update && apt-get install -y \
+    openssl \
     zip \
+    unzip \
+    git \
+    curl \
     libpng-dev \
-    libjpeg-turbo-dev \
-    freetype-dev \
-    libwebp-dev \
-    libxpm-dev \
-    git
+    libonig-dev \
+    libxml2-dev \
+    libzip-dev \
+    libxslt1-dev \
+    && docker-php-ext-install pdo_mysql mbstring xml zip xsl \
+    && rm -rf /var/lib/apt/lists/*
 
-RUN docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp
-RUN docker-php-ext-install -j$(nproc) gd zip pdo pdo_mysql
-
-COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 WORKDIR /var/www/html
-
 COPY . .
+
+RUN mkdir -p storage/framework/cache \
+    storage/framework/sessions \
+    storage/framework/views \
+    bootstrap/cache \
+    && chmod -R 777 storage bootstrap/cache
 
 RUN composer install --no-dev --optimize-autoloader --no-interaction
 
-RUN chown -R www-data:www-data /var/www/html \
-    && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
+EXPOSE 9000
+CMD ["php-fpm"]

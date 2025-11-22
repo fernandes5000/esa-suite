@@ -23,6 +23,8 @@ services:
     restart: unless-stopped
     volumes:
       - ./api:/var/www/html
+      - ./api/storage:/var/www/html/storage
+      - ./api/bootstrap/cache:/var/www/html/bootstrap/cache
     networks:
       - esa-network
     depends_on:
@@ -49,6 +51,8 @@ services:
     restart: unless-stopped
     volumes:
       - ./web:/var/www/html
+      - ./web/storage:/var/www/html/storage
+      - ./web/bootstrap/cache:/var/www/html/bootstrap/cache
     networks:
       - esa-network
     depends_on:
@@ -62,7 +66,7 @@ services:
     restart: unless-stopped
     volumes:
       - ./web:/var/www/html
-      - ./docker/nginx/web.conf:/etc/nginx/conf.d/default.conf # Caminho CORRETO
+      - ./docker/nginx/web.conf:/etc/nginx/conf.d/default.conf
     ports:
       - "${WEB_PORT:-8080}:80"
     networks:
