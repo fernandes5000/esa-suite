@@ -18,11 +18,10 @@ services:
   api-app:
     build:
       context: ./api
-      dockerfile: ../docker/php/api.Dockerfile
+    dockerfile: ../docker/php/api.Dockerfile
     container_name: ${PROJECT_NAME}_api_app
     restart: unless-stopped
     volumes:
-      - ./api:/var/www/html
       - ./api/storage:/var/www/html/storage
       - ./api/bootstrap/cache:/var/www/html/bootstrap/cache
     networks:
@@ -50,7 +49,6 @@ services:
     container_name: ${PROJECT_NAME}_web_app
     restart: unless-stopped
     volumes:
-      - ./web:/var/www/html
       - ./web/storage:/var/www/html/storage
       - ./web/bootstrap/cache:/var/www/html/bootstrap/cache
     networks:
