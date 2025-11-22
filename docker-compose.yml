@@ -18,7 +18,7 @@ services:
   api-app:
     build:
       context: ./api
-    dockerfile: ../docker/php/api.Dockerfile
+      dockerfile: ../docker/php/api.Dockerfile
     container_name: ${PROJECT_NAME}_api_app
     restart: unless-stopped
     volumes:
