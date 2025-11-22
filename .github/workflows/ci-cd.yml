@@ -3,18 +3,24 @@ name: Deploy ESA Project
 on:
   push:
     branches:
-      - main    # Production
-      - staging # Staging
-      - dev     # Development
+      - main     # Production
+      - staging  # Staging
+      - dev      # Development
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    
+
     environment:
-      name: ${{ (github.ref == 'refs/heads/main' && 'production') || (github.ref == 'refs/heads/staging' && 'staging') || 'development' }}
+      name: ${{ (github.ref == 'refs/heads/main' && 'production') 
+              || (github.ref == 'refs/heads/staging' && 'staging') 
+              || 'development' }}
 
     steps:
+
+      # ────────────────────────────────────────────────
+      # 1. ENVIRONMENT VARIABLE RESOLUTION
+      # ────────────────────────────────────────────────
       - name: 1. Defining Environment Variables
         id: vars
         run: |
@@ -23,17 +29,15 @@ jobs:
             echo "DIR_PATH=/home/deployer/esa-prod" >> $GITHUB_ENV
             echo "CONTAINER_WEB=esa_prod_web_app" >> $GITHUB_ENV
             echo "CONTAINER_API=esa_prod_api_app" >> $GITHUB_ENV
-            
             echo 'ENV_CONTENT<<EOF' >> $GITHUB_ENV
             echo '${{ secrets.ENV_PROD }}' >> $GITHUB_ENV
             echo 'EOF' >> $GITHUB_ENV
-            
+
           elif [[ "${{ github.ref }}" == "refs/heads/staging" ]]; then
             echo "BRANCH=staging" >> $GITHUB_ENV
             echo "DIR_PATH=/home/deployer/esa-stage" >> $GITHUB_ENV
             echo "CONTAINER_WEB=esa_stage_web_app" >> $GITHUB_ENV
             echo "CONTAINER_API=esa_stage_api_app" >> $GITHUB_ENV
-
             echo 'ENV_CONTENT<<EOF' >> $GITHUB_ENV
             echo '${{ secrets.ENV_STAGE }}' >> $GITHUB_ENV
             echo 'EOF' >> $GITHUB_ENV
@@ -43,80 +47,98 @@ jobs:
             echo "DIR_PATH=/home/deployer/esa-dev" >> $GITHUB_ENV
             echo "CONTAINER_WEB=esa_dev_web_app" >> $GITHUB_ENV
             echo "CONTAINER_API=esa_dev_api_app" >> $GITHUB_ENV
-
             echo 'ENV_CONTENT<<EOF' >> $GITHUB_ENV
             echo '${{ secrets.ENV_DEV }}' >> $GITHUB_ENV
             echo 'EOF' >> $GITHUB_ENV
           fi
 
+      # ────────────────────────────────────────────────
+      # 2. SSH CONFIGURATION
+      # ────────────────────────────────────────────────
       - name: 2. Setting up SSH
         uses: webfactory/ssh-agent@v0.5.3
         with:
           ssh-private-key: ${{ secrets.SERVER_SSH_KEY }}
 
+      # ────────────────────────────────────────────────
+      # 3. DEPLOY PROCESS
+      # ────────────────────────────────────────────────
       - name: 3. Connecting and Deploying
         run: |
           ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
-            
+
             set -e
+
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "      ESA DEPLOY STARTED"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
             # 1. Clone or Pull
             if [ ! -d "${{ env.DIR_PATH }}" ]; then
               echo "--- Cloning Repository ---"
               git clone https://github.com/${{ github.repository }}.git "${{ env.DIR_PATH }}"
             fi
+
             cd "${{ env.DIR_PATH }}"
+
             echo "--- Pulling latest changes ---"
+            git fetch
             git checkout "${{ env.BRANCH }}"
             git pull origin "${{ env.BRANCH }}"
-            
-            # 2. Create .env file
+
+            # 2. Write .env file
             echo "--- Creating .env file ---"
             echo "${{ env.ENV_CONTENT }}" > .env
-            
+
+            # Ensure required Laravel dirs exist BEFORE docker build
+            echo "--- Pre-Creating Laravel dirs ---"
+            mkdir -p web/storage/framework/{cache,sessions,views}
+            mkdir -p web/bootstrap/cache
+            mkdir -p api/storage/framework/{cache,sessions,views}
+            mkdir -p api/bootstrap/cache
+
             # 3. Start Containers
             echo "--- Starting Docker Containers ---"
             docker compose -f docker-compose.yml up -d --build --remove-orphans
-            
-            # 4. FIX PERMISSIONS (Passo Crítico)
+
+            # 4. Fix permissions (important)
             echo "--- Fixing Permissions (Root) ---"
-            docker compose -f docker-compose.yml exec -T -u root "${{ env.CONTAINER_WEB }}" chown -R www-data:www-data /var/www/html
-            docker compose -f docker-compose.yml exec -T -u root "${{ env.CONTAINER_API }}" chown -R www-data:www-data /var/www/html
-            
-            # 5. Install Dependencies (WEB)
+            docker compose exec -T -u root "${{ env.CONTAINER_WEB }}" chown -R www-data:www-data /var/www/html
+            docker compose exec -T -u root "${{ env.CONTAINER_API }}" chown -R www-data:www-data /var/www/html
+
+            # 5. Install WEB dependencies
             echo "--- Installing PHP Dependencies (WEB) ---"
-            docker compose -f docker-compose.yml exec -T -u root "${{ env.CONTAINER_WEB }}" composer install --no-dev --optimize-autoloader --no-interaction
-            
+            docker compose exec -T -u root "${{ env.CONTAINER_WEB }}" composer install --no-dev --optimize-autoloader --no-interaction
+
             echo "--- Installing JS Dependencies (WEB) ---"
-            docker compose -f docker-compose.yml exec -T -u root "${{ env.CONTAINER_WEB }}" npm install
-            docker compose -f docker-compose.yml exec -T -u root "${{ env.CONTAINER_WEB }}" npm run build
-            
-            # 6. Install Dependencies (API)
+            docker compose exec -T -u root "${{ env.CONTAINER_WEB }}" npm install
+            docker compose exec -T -u root "${{ env.CONTAINER_WEB }}" npm run build
+
+            # 6. Install API dependencies
             echo "--- Installing PHP Dependencies (API) ---"
-            docker compose -f docker-compose.yml exec -T -u root "${{ env.CONTAINER_API }}" composer install --no-dev --optimize-autoloader --no-interaction
-            
-            # 7. Final Permission Fix
+            docker compose exec -T -u root "${{ env.CONTAINER_API }}" composer install --no-dev --optimize-autoloader --no-interaction
+
+            # 7. Final permission fix
             echo "--- Finalizing Permissions ---"
-            docker compose -f docker-compose.yml exec -T -u root "${{ env.CONTAINER_WEB }}" chown -R www-data:www-data /var/www/html
-            docker compose -f docker-compose.yml exec -T -u root "${{ env.CONTAINER_API }}" chown -R www-data:www-data /var/www/html
-            
-            docker compose -f docker-compose.yml exec -T -u root "${{ env.CONTAINER_WEB }}" chmod -R 775 storage bootstrap/cache
-            docker compose -f docker-compose.yml exec -T -u root "${{ env.CONTAINER_API }}" chmod -R 775 storage bootstrap/cache
+            docker compose exec -T -u root "${{ env.CONTAINER_WEB }}" chmod -R 775 storage bootstrap/cache
+            docker compose exec -T -u root "${{ env.CONTAINER_API }}" chmod -R 775 storage bootstrap/cache
 
             # 8. Laravel Commands
             echo "--- Running Laravel Commands (WEB) ---"
-            docker compose -f docker-compose.yml exec -T "${{ env.CONTAINER_WEB }}" php artisan config:cache
-            docker compose -f docker-compose.yml exec -T "${{ env.CONTAINER_WEB }}" php artisan route:cache
-            docker compose -f docker-compose.yml exec -T "${{ env.CONTAINER_WEB }}" php artisan view:cache
-            
+            docker compose exec -T "${{ env.CONTAINER_WEB }}" php artisan config:cache
+            docker compose exec -T "${{ env.CONTAINER_WEB }}" php artisan route:cache
+            docker compose exec -T "${{ env.CONTAINER_WEB }}" php artisan view:cache
+
             echo "--- Running Laravel Commands (API) ---"
-            docker compose -f docker-compose.yml exec -T "${{ env.CONTAINER_API }}" php artisan config:cache
-            docker compose -f docker-compose.yml exec -T "${{ env.CONTAINER_API }}" php artisan route:cache
-            docker compose -f docker-compose.yml exec -T "${{ env.CONTAINER_API }}" php artisan migrate --force
-            
+            docker compose exec -T "${{ env.CONTAINER_API }}" php artisan config:cache
+            docker compose exec -T "${{ env.CONTAINER_API }}" php artisan route:cache
+            docker compose exec -T "${{ env.CONTAINER_API }}" php artisan migrate --force
+
             # 9. Cleanup
-            echo "--- Cleaning up ---"
+            echo "--- Cleaning up Docker ---"
             docker image prune -af
-            
-            echo "--- DEPLOY SUCCESSFUL ---"
+
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "      ESA DEPLOY SUCCESS!"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
           EOF
