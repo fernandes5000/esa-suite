@@ -49,52 +49,56 @@ jobs:
 
             echo "Deploying to $DIR_PATH (branch: $BRANCH)"
 
-            # Se não existir, clona
-            if [ ! -d "$DIR_PATH/.git" ]; then
-              echo "Primeiro deploy — clonando repositório..."
+            # Se não existe, clona limpo
+            if [ ! -d "$DIR_PATH" ]; then
+              echo "Primeiro deploy — clonando limpo..."
               rm -rf "$DIR_PATH"
+              mkdir -p "$DIR_PATH"
               git clone https://github.com/${{ github.repository }}.git "$DIR_PATH"
               cd "$DIR_PATH"
             else
               cd "$DIR_PATH"
-              
-              # FORÇA a correção de permissões ANTES de qualquer git
-              echo "Corrigindo permissões antes do git..."
-              sudo chown -R $(whoami):$(whoami) .
-              find . -type f -exec chmod 664 {} \;
-              find . -type d -exec chmod 775 {} \;
-              
-              # Agora faz o git com força bruta
-              git fetch --all --prune
-              git checkout "$BRANCH"
-              git reset --hard "origin/$BRANCH"
-              git clean -fd
             fi
 
-            # Escreve o .env
+            # FORÇA RESET TOTAL (agora funciona porque tem sudo sem senha)
+            echo "Resetando repositório com força bruta..."
+            git fetch --all --prune --quiet
+            git checkout "$BRANCH" --force
+            git reset --hard "origin/$BRANCH" --quiet
+            git clean -fdx --quiet
+
+            # Garante que tudo pertence ao deployer
+            sudo chown -R $(whoami):$(whoami) .
+
+            # Escreve .env
             echo "$ENV_B64" | base64 -d > .env
             cp .env web/.env
             cp .env api/.env
 
-            # Ajusta nomes dos apps
+            # Ajusta nomes
             sed -i 's/^APP_NAME=.*/APP_NAME=PetCertify_API/' api/.env
             sed -i 's/^APP_NAME=.*/APP_NAME=PetCertify/' web/.env
 
-            # Ajusta URLs da API no frontend (importante!)
-            DOMAIN=$(echo "$DIR_PATH" | grep -oE 'esa-(dev|stage|prod)' | sed 's/esa-/esa-/; s/-$//')
-            PUBLIC_API="https://$DOMAIN.engineer.ninja/api"
+            # Corrige URLs da API no frontend
+            if echo "$DIR_PATH" | grep -q "esa-dev"; then
+              DOMAIN="esa-dev.engineer.ninja"
+            elif echo "$DIR_PATH" | grep -q "esa-stage"; then
+              DOMAIN="esa-stage.engineer.ninja"
+            else
+              DOMAIN="esa.engineer.ninja"
+            fi
+
             sed -i "s|API_BASE_URL=.*|API_BASE_URL=http://api-nginx|" web/.env
             sed -i "s|API_URL=.*|API_URL=http://api-nginx/api|" web/.env
-            sed -i "s|API_PUBLIC_URL=.*|API_PUBLIC_URL=$PUBLIC_API|" web/.env
+            sed -i "s|API_PUBLIC_URL=.*|API_PUBLIC_URL=https://$DOMAIN/api|" web/.env
 
-            # Reconstrói tudo
-            echo "Parando containers antigos..."
-            docker compose down --remove-orphans || true
-
-            echo "Construindo e subindo containers..."
+            # Reconstrói tudo do zero
+            echo "Recriando containers..."
+            docker compose down --remove-orphans --volumes || true
             docker compose up -d --build --force-recreate
 
-            echo "Instalando dependências PHP..."
+            # Instala dependências
+            echo "Instalando Composer..."
             docker compose exec -T web-app composer install --optimize-autoloader --no-dev --no-interaction
             docker compose exec -T api-app composer install --optimize-autoloader --no-dev --no-interaction
 
@@ -102,14 +106,18 @@ jobs:
             docker compose exec -T web-app npm install --no-save
             docker compose exec -T web-app npm run build
 
-            echo "Migrations e otimizações..."
+            echo "Migrations e cache..."
             docker compose exec -T api-app php artisan migrate --force
             docker compose exec -T web-app php artisan optimize:clear
-            docker compose exec -T web-app php artisan optimize
+            docker compose exec -T web-app php artisan config:cache
+            docker compose exec -T web-app php artisan route:cache
+            docker compose exec -T web-app php artisan view:cache
             docker compose exec -T api-app php artisan optimize
 
-            echo "Limpando imagens órfãs..."
+            echo "Limpando imagens antigas..."
             docker image prune -f
 
             echo "DEPLOY CONCLUÍDO COM SUCESSO!"
+            echo "Frontend: https://$DOMAIN"
+            echo "API: https://$DOMAIN/api"
           EOF
