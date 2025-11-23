@@ -49,19 +49,29 @@ jobs:
 
             echo "Deploying to $DIR_PATH (branch: $BRANCH)"
 
+            # Se não existir, clona
             if [ ! -d "$DIR_PATH/.git" ]; then
-              echo "First time deploy — cloning..."
+              echo "Primeiro deploy — clonando repositório..."
               rm -rf "$DIR_PATH"
               git clone https://github.com/${{ github.repository }}.git "$DIR_PATH"
+              cd "$DIR_PATH"
+            else
+              cd "$DIR_PATH"
+              
+              # FORÇA a correção de permissões ANTES de qualquer git
+              echo "Corrigindo permissões antes do git..."
+              sudo chown -R $(whoami):$(whoami) .
+              find . -type f -exec chmod 664 {} \;
+              find . -type d -exec chmod 775 {} \;
+              
+              # Agora faz o git com força bruta
+              git fetch --all --prune
+              git checkout "$BRANCH"
+              git reset --hard "origin/$BRANCH"
+              git clean -fd
             fi
 
-            cd "$DIR_PATH"
-
-            git fetch origin
-            git checkout "$BRANCH"
-            git reset --hard origin/$BRANCH
-            git clean -fd
-
+            # Escreve o .env
             echo "$ENV_B64" | base64 -d > .env
             cp .env web/.env
             cp .env api/.env
@@ -70,26 +80,36 @@ jobs:
             sed -i 's/^APP_NAME=.*/APP_NAME=PetCertify_API/' api/.env
             sed -i 's/^APP_NAME=.*/APP_NAME=PetCertify/' web/.env
 
-            # Corrige URLs da API no .env do frontend
+            # Ajusta URLs da API no frontend (importante!)
+            DOMAIN=$(echo "$DIR_PATH" | grep -oE 'esa-(dev|stage|prod)' | sed 's/esa-/esa-/; s/-$//')
+            PUBLIC_API="https://$DOMAIN.engineer.ninja/api"
             sed -i "s|API_BASE_URL=.*|API_BASE_URL=http://api-nginx|" web/.env
             sed -i "s|API_URL=.*|API_URL=http://api-nginx/api|" web/.env
-            sed -i "s|API_PUBLIC_URL=.*|API_PUBLIC_URL=https://$(echo $DIR_PATH | grep -oE 'esa-(dev|stage|prod)' | sed 's/esa-//').engineer.ninja/api|" web/.env
+            sed -i "s|API_PUBLIC_URL=.*|API_PUBLIC_URL=$PUBLIC_API|" web/.env
 
-            echo "Rebuilding containers..."
-            docker compose down --remove-orphans
-            docker compose up -d --build
+            # Reconstrói tudo
+            echo "Parando containers antigos..."
+            docker compose down --remove-orphans || true
 
-            echo "Installing dependencies..."
+            echo "Construindo e subindo containers..."
+            docker compose up -d --build --force-recreate
+
+            echo "Instalando dependências PHP..."
             docker compose exec -T web-app composer install --optimize-autoloader --no-dev --no-interaction
             docker compose exec -T api-app composer install --optimize-autoloader --no-dev --no-interaction
 
-            docker compose exec -T web-app npm install && npm run build
+            echo "Build do frontend..."
+            docker compose exec -T web-app npm install --no-save
+            docker compose exec -T web-app npm run build
 
+            echo "Migrations e otimizações..."
             docker compose exec -T api-app php artisan migrate --force
+            docker compose exec -T web-app php artisan optimize:clear
             docker compose exec -T web-app php artisan optimize
             docker compose exec -T api-app php artisan optimize
 
+            echo "Limpando imagens órfãs..."
             docker image prune -f
 
-            echo "Deploy concluído com sucesso!"
+            echo "DEPLOY CONCLUÍDO COM SUCESSO!"
           EOF
