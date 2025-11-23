@@ -94,7 +94,8 @@ jobs:
 
             # Reconstrói tudo do zero
             echo "Recriando containers..."
-            docker compose down --remove-orphans --volumes || true
+            docker compose -f docker-compose.yml down --remove-orphans --volumes || true
+            docker compose -f docker-compose.yml up -d --build --force-recreate
             docker compose up -d --build --force-recreate
 
             # Instala dependências

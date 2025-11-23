@@ -1,9 +1,11 @@
 services:
-  # WEB (Laravel + Livewire + Vite)
+  # WEB APP (Laravel + Livewire)
   web-app:
     build:
-      context: ./web
-      dockerfile: ./docker/php/web.Dockerfile
+      context: .
+      dockerfile: docker/php/web.Dockerfile
+      args:
+        - APP_ENV=${APP_ENV:-production}
     container_name: ${PROJECT_NAME}_web_app
     restart: unless-stopped
     working_dir: /var/www/web
@@ -34,8 +36,10 @@ services:
   # API
   api-app:
     build:
-      context: ./api
-      dockerfile: ./docker/php/api.Dockerfile
+      context: .
+      dockerfile: docker/php/api.Dockerfile
+      args:
+        - APP_ENV=${APP_ENV:-production}
     container_name: ${PROJECT_NAME}_api_app
     restart: unless-stopped
     working_dir: /var/www/api
@@ -63,7 +67,6 @@ services:
     depends_on:
       - api-app
 
-  # MySQL
   mysql:
     image: mysql:8.0
     container_name: ${PROJECT_NAME}_mysql
@@ -77,18 +80,13 @@ services:
       - mysql_data:/var/lib/mysql
     networks:
       - esa-network
-    ports:
-      - "3308:3306"
 
-  # Redis
   redis:
     image: redis:alpine
     container_name: ${PROJECT_NAME}_redis
     restart: unless-stopped
     networks:
       - esa-network
-    ports:
-      - "6379:6379"
 
 networks:
   esa-network:
