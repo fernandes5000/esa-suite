@@ -47,7 +47,7 @@ jobs:
 
             echo "Deploying to $DIR_PATH (branch: $BRANCH)"
 
-            # Primeiro deploy ou limpeza total
+            # Clone ou atualização forçada
             if [ ! -d "$DIR_PATH" ]; then
               echo "Primeiro deploy — clonando..."
               rm -rf "$DIR_PATH"
@@ -55,9 +55,7 @@ jobs:
               cd "$DIR_PATH"
             else
               cd "$DIR_PATH"
-
-              # FORÇA LIMPEZA TOTAL COM SUDO (resolve todos os "Permission denied")
-              echo "Limpando arquivos antigos com força bruta..."
+              echo "Limpando tudo com força bruta..."
               sudo git clean -fdx
               sudo git reset --hard
               git fetch --all --prune --quiet
@@ -65,7 +63,7 @@ jobs:
               git reset --hard "origin/$BRANCH" --quiet
             fi
 
-            # Domínio correto
+            # Domínio
             if echo "$DIR_PATH" | grep -q "esa-dev"; then
               DOMAIN="esa-dev.engineer.ninja"
             elif echo "$DIR_PATH" | grep -q "esa-stage"; then
@@ -79,36 +77,45 @@ jobs:
             cp .env web/.env
             cp .env api/.env
 
-            sed -i 's/^APP_NAME=.*/APP_NAME=PetCertify_API/' api/.env
+            sed493 -i 's/^APP_NAME=.*/APP_NAME=PetCertify_API/' api/.env
             sed -i 's/^APP_NAME=.*/APP_NAME=PetCertify/' web/.env
-
             sed -i "s|API_BASE_URL=.*|API_BASE_URL=http://api-nginx|" web/.env
             sed -i "s|API_URL=.*|API_URL=http://api-nginx/api|" web/.env
             sed -i "s|API_PUBLIC_URL=.*|API_PUBLIC_URL=https://$DOMAIN/api|" web/.env
 
-            # CRIA PASTAS DE STORAGE ANTES DE TUDO
+            # Pastas de storage/cache
             echo "Criando pastas de storage..."
             mkdir -p web/storage/framework/{cache/data,sessions,views} web/storage/logs web/bootstrap/cache
             mkdir -p api/storage/framework/{cache/data,sessions,views} api/storage/logs api/bootstrap/cache
-
-            # Permissões corretas
             sudo chown -R www-data:www-data web/storage api/storage web/bootstrap/cache api/bootstrap/cache
             sudo chmod -R 775 web/storage api/storage web/bootstrap/cache api/bootstrap/cache
 
-            # Recria containers
+            # Rebuild containers (com Redis já incluso no Dockerfile)
             echo "Recriando containers..."
             docker compose -f docker-compose.yml down --remove-orphans --volumes --timeout 30 || true
             docker compose -f docker-compose.yml up -d --build --force-recreate
 
-            # Composer (agora 100% garantido)
-            echo "Instalando Composer (web + api)..."
+            # Composer
+            echo "Instalando Composer..."
             docker compose exec -T web-app composer install --optimize-autoloader --no-dev --no-interaction
             docker compose exec -T api-app composer install --optimize-autoloader --no-dev --no-interaction
 
-            # Frontend
-            echo "Build do frontend..."
-            docker compose exec -T web-app npm install --no-save
-            docker compose exec -T web-app npm run build
+            # FRONTEND — BUILD DO VITE 100% GARANTIDO
+            echo "Reconstruindo frontend com força total..."
+            docker compose exec -T web-app rm -rf node_modules package-lock.json .vite
+            docker compose exec -T -e NODE_OPTIONS=--max_old_space_size=4096 web-app npm install --no-save --legacy-peer-deps
+            docker compose exec -T -e NODE_OPTIONS=--max_old_space_size=4096 web-app npm run build
+
+            # Verificação final do manifest
+            docker compose exec -T web-app bash -c "
+              if [ ! -f public/build/manifest.json ]; then
+                echo 'ERRO: manifest.json não foi gerado!'
+                ls -la public/build/ || echo 'Pasta build não existe'
+                exit 1
+              else
+                echo 'Vite manifest encontrado com sucesso!'
+              fi
+            "
 
             # Laravel final
             echo "Migrations e cache..."
@@ -119,6 +126,7 @@ jobs:
             docker compose exec -T web-app php artisan view:cache
             docker compose exec -T api-app php artisan optimize
 
+            # Limpeza
             docker image prune -f
 
             echo ""
