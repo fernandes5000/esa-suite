@@ -116,4 +116,4 @@ jobs:
             docker compose exec -T -u root api-app chown -R www-data:www-data /var/www/html
 
             docker image prune -af || true
-EOF
+          EOF
