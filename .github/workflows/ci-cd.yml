@@ -22,15 +22,17 @@ jobs:
           if [[ "${GITHUB_REF}" == "refs/heads/main" ]]; then
             echo "BRANCH=main" >> $GITHUB_ENV
             echo "DIR_PATH=/home/deployer/esa-prod" >> $GITHUB_ENV
-            echo "ENV_CONTENT=${{ secrets.ENV_PROD }}" >> $GITHUB_ENV
+            echo "ENV_B64=${{ secrets.ENV_PROD_BASE64 }}" >> $GITHUB_ENV
+
           elif [[ "${GITHUB_REF}" == "refs/heads/staging" ]]; then
             echo "BRANCH=staging" >> $GITHUB_ENV
             echo "DIR_PATH=/home/deployer/esa-stage" >> $GITHUB_ENV
-            echo "ENV_CONTENT=${{ secrets.ENV_STAGE }}" >> $GITHUB_ENV
+            echo "ENV_B64=${{ secrets.ENV_STAGE_BASE64 }}" >> $GITHUB_ENV
+
           else
             echo "BRANCH=dev" >> $GITHUB_ENV
             echo "DIR_PATH=/home/deployer/esa-dev" >> $GITHUB_ENV
-            echo "ENV_CONTENT=${{ secrets.ENV_DEV }}" >> $GITHUB_ENV
+            echo "ENV_B64=${{ secrets.ENV_DEV_BASE64 }}" >> $GITHUB_ENV
           fi
 
       - name: Setup SSH
@@ -40,12 +42,12 @@ jobs:
 
       - name: Deploy over SSH
         run: |
-          ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << EOF
+          ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
             set -e
 
             DIR_PATH="${{ env.DIR_PATH }}"
             BRANCH="${{ env.BRANCH }}"
-            ENV_FILE_CONTENT="${{ env.ENV_CONTENT }}"
+            ENV_B64="${{ env.ENV_B64 }}"
 
             echo "Deploying branch: \$BRANCH"
             echo "Path: \$DIR_PATH"
@@ -62,15 +64,15 @@ jobs:
             git checkout "\$BRANCH"
             git pull origin "\$BRANCH"
 
-            echo "--- Writing .env files ---"
-            echo "$ENV_FILE_CONTENT" > .env
-            cp .env web/.env
+            echo "--- Writing .env files (base64 decoded) ---"
+            echo "\$ENV_B64" | base64 -d > .env
             cp .env api/.env
+            cp .env web/.env
 
             sed -i 's/^APP_NAME=.*/APP_NAME=PetCertify_API/' api/.env
             sed -i 's/^APP_NAME=.*/APP_NAME=PetCertify/' web/.env
 
-            echo "--- Creating required Laravel directories ---"
+            echo "--- Creating Laravel directories ---"
             mkdir -p web/storage/framework/{cache,views,sessions}
             mkdir -p web/bootstrap/cache
             mkdir -p api/storage/framework/{cache,views,sessions}
@@ -80,7 +82,7 @@ jobs:
             docker compose down || true
             docker compose up -d --build --remove-orphans
 
-            echo "--- Cleaning leftover vendors ---"
+            echo "--- Cleaning vendor ---"
             docker compose exec -T web-app rm -rf vendor || true
             docker compose exec -T api-app rm -rf vendor || true
 
@@ -94,23 +96,14 @@ jobs:
             echo "--- Installing PHP dependencies (API) ---"
             docker compose exec -T api-app composer install --no-dev --optimize-autoloader --no-interaction
 
-            echo "--- Running Laravel commands (WEB) ---"
-            docker compose exec -T web-app php artisan clear-compiled
-            docker compose exec -T web-app php artisan config:clear
-            docker compose exec -T web-app php artisan cache:clear
-            docker compose exec -T web-app php artisan config:cache
-            docker compose exec -T web-app php artisan route:cache
-            docker compose exec -T web-app php artisan view:cache
+            echo "--- Laravel optimize commands (WEB) ---"
+            docker compose exec -T web-app php artisan optimize
 
-            echo "--- Running Laravel commands (API) ---"
-            docker compose exec -T api-app php artisan clear-compiled
-            docker compose exec -T api-app php artisan config:clear
-            docker compose exec -T api-app php artisan cache:clear
-            docker compose exec -T api-app php artisan config:cache
-            docker compose exec -T api-app php artisan route:cache
+            echo "--- Laravel optimize commands (API) ---"
             docker compose exec -T api-app php artisan migrate --force
+            docker compose exec -T api-app php artisan optimize
 
-            echo "--- Fixing permissions inside containers ---"
+            echo "--- Fixing permissions ---"
             docker compose exec -T -u root web-app chown -R www-data:www-data /var/www/html
             docker compose exec -T -u root api-app chown -R www-data:www-data /var/www/html
 
