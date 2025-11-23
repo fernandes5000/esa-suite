@@ -34,14 +34,14 @@ jobs:
           fi
 
       - name: Setup SSH
-        uses: webfactory/ssh-agent@v0.5.3
+        uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.SERVER_SSH_KEY }}
 
       - name: Deploy over SSH
         run: |
           ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
-            set -e
+            set -e  # para o script no primeiro erro
 
             DIR_PATH="${{ env.DIR_PATH }}"
             BRANCH="${{ env.BRANCH }}"
@@ -49,37 +49,21 @@ jobs:
 
             echo "Deploying to $DIR_PATH (branch: $BRANCH)"
 
-            # Se não existe, clona limpo
+            # Primeiro deploy ou limpeza total
             if [ ! -d "$DIR_PATH" ]; then
               echo "Primeiro deploy — clonando limpo..."
               rm -rf "$DIR_PATH"
-              mkdir -p "$DIR_PATH"
               git clone https://github.com/${{ github.repository }}.git "$DIR_PATH"
               cd "$DIR_PATH"
             else
               cd "$DIR_PATH"
+              git fetch --all --prune --quiet
+              git checkout "$BRANCH" --force
+              git reset --hard "origin/$BRANCH" --quiet
+              git clean -fdx --quiet
             fi
 
-            # FORÇA RESET TOTAL (agora funciona porque tem sudo sem senha)
-            echo "Resetando repositório com força bruta..."
-            git fetch --all --prune --quiet
-            git checkout "$BRANCH" --force
-            git reset --hard "origin/$BRANCH" --quiet
-            git clean -fdx --quiet
-
-            # Garante que tudo pertence ao deployer
-            sudo chown -R $(whoami):$(whoami) .
-
-            # Escreve .env
-            echo "$ENV_B64" | base64 -d > .env
-            cp .env web/.env
-            cp .env api/.env
-
-            # Ajusta nomes
-            sed -i 's/^APP_NAME=.*/APP_NAME=PetCertify_API/' api/.env
-            sed -i 's/^APP_NAME=.*/APP_NAME=PetCertify/' web/.env
-
-            # Corrige URLs da API no frontend
+            # Define domínio correto
             if echo "$DIR_PATH" | grep -q "esa-dev"; then
               DOMAIN="esa-dev.engineer.ninja"
             elif echo "$DIR_PATH" | grep -q "esa-stage"; then
@@ -88,25 +72,45 @@ jobs:
               DOMAIN="esa.engineer.ninja"
             fi
 
+            # Escreve .env
+            echo "$ENV_B64" | base64 -d > .env
+            cp .env web/.env
+            cp .env api/.env
+
+            # Ajusta nomes dos apps
+            sed -i 's/^APP_NAME=.*/APP_NAME=PetCertify_API/' api/.env
+            sed -i 's/^APP_NAME=.*/APP_NAME=PetCertify/' web/.env
+
+            # URLs da API (importante pro frontend)
             sed -i "s|API_BASE_URL=.*|API_BASE_URL=http://api-nginx|" web/.env
             sed -i "s|API_URL=.*|API_URL=http://api-nginx/api|" web/.env
             sed -i "s|API_PUBLIC_URL=.*|API_PUBLIC_URL=https://$DOMAIN/api|" web/.env
 
-            # Reconstrói tudo do zero
+            # CRIA TODAS AS PASTAS DE STORAGE ANTES DO COMPOSER (linha mágica!)
+            echo "Criando pastas de storage/cache..."
+            mkdir -p web/storage/framework/{cache/data,sessions,views} web/storage/logs web/bootstrap/cache
+            mkdir -p api/storage/framework/{cache/data,sessions,views} api/storage/logs api/bootstrap/cache
+
+            # Permissões corretas (www-data dentro dos containers)
+            sudo chown -R www-data:www-data web/storage api/storage web/bootstrap/cache api/bootstrap/cache
+            sudo chmod -R 775 web/storage api/storage web/bootstrap/cache api/bootstrap/cache
+
+            # Recria containers do zero
             echo "Recriando containers..."
-            docker compose -f docker-compose.yml down --remove-orphans --volumes || true
-            docker compose -f docker-compose.yml up -d --build --force-recreate
-            docker compose up -d --build --force-recreate
+            docker compose -f docker-compose.yml down --remove-orphans --volumes --timeout 30 || true
+            docker compose -f docker-compose.yml up -d --build --force-recreate --remove-orphans
 
-            # Instala dependências
-            echo "Instalando Composer..."
-            docker compose exec -T web-app composer install --optimize-autoloader --no-dev --no-interaction
-            docker compose exec -T api-app composer install --optimize-autoloader --no-dev --no-interaction
+            # Composer (agora as pastas existem → nunca mais dá erro de cache path)
+            echo "Instalando dependências PHP..."
+            docker compose exec -T web-app composer install --optimize-autoloader --no-dev --no-interaction --no-progress
+            docker compose exec -T api-app composer install --optimize-autoloader --no-dev --no-interaction --no-progress
 
-            echo "Build do frontend..."
+            # Frontend
+            echo "Construindo assets..."
             docker compose exec -T web-app npm install --no-save
             docker compose exec -T web-app npm run build
 
+            # Laravel final
             echo "Migrations e cache..."
             docker compose exec -T api-app php artisan migrate --force
             docker compose exec -T web-app php artisan optimize:clear
@@ -115,10 +119,14 @@ jobs:
             docker compose exec -T web-app php artisan view:cache
             docker compose exec -T api-app php artisan optimize
 
-            echo "Limpando imagens antigas..."
+            # Limpeza
             docker image prune -f
 
-            echo "DEPLOY CONCLUÍDO COM SUCESSO!"
-            echo "Frontend: https://$DOMAIN"
-            echo "API: https://$DOMAIN/api"
+            echo ""
+            echo "=================================================="
+            echo "   DEPLOY CONCLUÍDO COM SUCESSO!"
+            echo "   Frontend → https://$DOMAIN"
+            echo "   API      → https://$DOMAIN/api"
+            echo "=================================================="
+            echo ""
           EOF
