@@ -23,12 +23,10 @@ jobs:
             echo "BRANCH=main" >> $GITHUB_ENV
             echo "DIR_PATH=/home/deployer/esa-prod" >> $GITHUB_ENV
             echo "ENV_CONTENT=${{ secrets.ENV_PROD }}" >> $GITHUB_ENV
-
           elif [[ "${GITHUB_REF}" == "refs/heads/staging" ]]; then
             echo "BRANCH=staging" >> $GITHUB_ENV
             echo "DIR_PATH=/home/deployer/esa-stage" >> $GITHUB_ENV
             echo "ENV_CONTENT=${{ secrets.ENV_STAGE }}" >> $GITHUB_ENV
-
           else
             echo "BRANCH=dev" >> $GITHUB_ENV
             echo "DIR_PATH=/home/deployer/esa-dev" >> $GITHUB_ENV
@@ -80,7 +78,6 @@ jobs:
 
             echo "--- Rebuilding Docker containers ---"
             docker compose down || true
-            docker compose pull || true
             docker compose up -d --build --remove-orphans
 
             echo "--- Cleaning leftover vendors ---"
