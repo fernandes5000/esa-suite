@@ -15,6 +15,13 @@ services:
     networks:
       - esa-network
 
+  redis:
+    image: redis:7-alpine
+    container_name: ${PROJECT_NAME}_redis
+    restart: unless-stopped
+    networks:
+      - esa-network
+
   api-app:
     build:
       context: ./api
@@ -22,12 +29,12 @@ services:
     container_name: ${PROJECT_NAME}_api_app
     restart: unless-stopped
     volumes:
-      - ./api/storage:/var/www/html/storage
-      - ./api/bootstrap/cache:/var/www/html/bootstrap/cache
+      - ./api:/var/www/html
     networks:
       - esa-network
     depends_on:
       - mysql
+      - redis
     command: bash -lc "php-fpm"
 
   api-nginx:
@@ -49,12 +56,12 @@ services:
     container_name: ${PROJECT_NAME}_web_app
     restart: unless-stopped
     volumes:
-      - ./web/storage:/var/www/html/storage
-      - ./web/bootstrap/cache:/var/www/html/bootstrap/cache
+      - ./web:/var/www/html
     networks:
       - esa-network
     depends_on:
       - mysql
+      - redis
       - api-nginx
     command: bash -lc "php-fpm"
 
@@ -78,6 +85,6 @@ networks:
 
 volumes:
   mysql_data:
-  esa-db-dev:
-  esa-db-stage:
-  esa-db-prod:
+  mysql_data_dev:
+  mysql_data_stage:
+  mysql_data_prod:
