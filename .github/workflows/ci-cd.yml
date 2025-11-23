@@ -40,13 +40,14 @@ jobs:
 
       - name: Deploy over SSH
         run: |
-          ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << EOF
+          ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
             set -e
-
+            
             DIR_PATH="${{ env.DIR_PATH }}"
             BRANCH="${{ env.BRANCH }}"
             ENV_FILE_CONTENT="${{ env.ENV_CONTENT }}"
 
+            # Clone if not exists
             if [ ! -d "\$DIR_PATH" ]; then
               git clone https://github.com/${{ github.repository }}.git "\$DIR_PATH"
             fi
@@ -57,45 +58,62 @@ jobs:
             git checkout "\$BRANCH"
             git pull origin "\$BRANCH"
 
-            echo "\$ENV_FILE_CONTENT" | sed 's/\r$//' > .env
-
-            chmod -R u+rw web api
-
+            # Write .env files
+            echo "\$ENV_FILE_CONTENT" > .env
             cp .env api/.env
             cp .env web/.env
 
-            sed -i 's/^APP_NAME=.*/APP_NAME=PetCertify_API/' api/.env || echo "APP_NAME=PetCertify_API" >> api/.env
-            sed -i 's/^APP_NAME=.*/APP_NAME=PetCertify/' web/.env || echo "APP_NAME=PetCertify" >> web/.env
+            # Fix names
+            sed -i 's/^APP_NAME=.*/APP_NAME=PetCertify_API/' api/.env
+            sed -i 's/^APP_NAME=.*/APP_NAME=PetCertify/' web/.env
 
-            mkdir -p web/storage/framework/cache web/storage/framework/views web/storage/framework/sessions
+            # Pre-create Laravel folders
+            mkdir -p web/storage/framework/{cache,views,sessions}
             mkdir -p web/bootstrap/cache
-            mkdir -p api/storage/framework/cache api/storage/framework/views api/storage/framework/sessions
+            mkdir -p api/storage/framework/{cache,views,sessions}
             mkdir -p api/bootstrap/cache
 
+            # Make sure deployer owns all
+            sudo chown -R \$USER:\$USER .
+
+            # Docker recreate
             docker compose down || true
             docker compose -f docker-compose.yml pull || true
             docker compose -f docker-compose.yml up -d --build --remove-orphans
 
-            docker compose exec -T -u root web-app chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
-            docker compose exec -T -u root api-app chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
+            # Delete vendor BEFORE reinstalling (prevent root-owned conflicts)
+            docker compose exec -T web-app rm -rf vendor || true
+            docker compose exec -T api-app rm -rf vendor || true
 
+            # Composer install (WEB)
             docker compose exec -T web-app composer install --no-dev --optimize-autoloader --no-interaction
+
+            # NPM build (WEB)
             docker compose exec -T web-app npm install
             docker compose exec -T web-app npm run build
 
+            # Composer install (API)
             docker compose exec -T api-app composer install --no-dev --optimize-autoloader --no-interaction
 
+            # Laravel commands WEB
+            docker compose exec -T web-app php artisan clear-compiled
             docker compose exec -T web-app php artisan config:clear
             docker compose exec -T web-app php artisan cache:clear
             docker compose exec -T web-app php artisan config:cache
             docker compose exec -T web-app php artisan route:cache
             docker compose exec -T web-app php artisan view:cache
 
+            # Laravel commands API
+            docker compose exec -T api-app php artisan clear-compiled
             docker compose exec -T api-app php artisan config:clear
             docker compose exec -T api-app php artisan cache:clear
             docker compose exec -T api-app php artisan config:cache
             docker compose exec -T api-app php artisan route:cache
             docker compose exec -T api-app php artisan migrate --force
+
+            # Final permissions to www-data
+            docker compose exec -T -u root web-app chown -R www-data:www-data /var/www/html
+            docker compose exec -T -u root api-app chown -R www-data:www-data /var/www/html
 
             docker image prune -af || true
           EOF
