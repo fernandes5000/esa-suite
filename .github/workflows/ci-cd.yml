@@ -77,7 +77,8 @@ jobs:
             cp .env web/.env
             cp .env api/.env
 
-            sed493 -i 's/^APP_NAME=.*/APP_NAME=PetCertify_API/' api/.env
+            # CORRIGIDO: era sed493 → agora é sed normal
+            sed -i 's/^APP_NAME=.*/APP_NAME=PetCertify_API/' api/.env
             sed -i 's/^APP_NAME=.*/APP_NAME=PetCertify/' web/.env
             sed -i "s|API_BASE_URL=.*|API_BASE_URL=http://api-nginx|" web/.env
             sed -i "s|API_URL=.*|API_URL=http://api-nginx/api|" web/.env
@@ -90,7 +91,7 @@ jobs:
             sudo chown -R www-data:www-data web/storage api/storage web/bootstrap/cache api/bootstrap/cache
             sudo chmod -R 775 web/storage api/storage web/bootstrap/cache api/bootstrap/cache
 
-            # Rebuild containers (com Redis já incluso no Dockerfile)
+            # Rebuild containers
             echo "Recriando containers..."
             docker compose -f docker-compose.yml down --remove-orphans --volumes --timeout 30 || true
             docker compose -f docker-compose.yml up -d --build --force-recreate
@@ -100,13 +101,13 @@ jobs:
             docker compose exec -T web-app composer install --optimize-autoloader --no-dev --no-interaction
             docker compose exec -T api-app composer install --optimize-autoloader --no-dev --no-interaction
 
-            # FRONTEND — BUILD DO VITE 100% GARANTIDO
-            echo "Reconstruindo frontend com força total..."
+            # FRONTEND — VITE 100% garantido
+            echo "Reconstruindo frontend..."
             docker compose exec -T web-app rm -rf node_modules package-lock.json .vite
             docker compose exec -T -e NODE_OPTIONS=--max_old_space_size=4096 web-app npm install --no-save --legacy-peer-deps
             docker compose exec -T -e NODE_OPTIONS=--max_old_space_size=4096 web-app npm run build
 
-            # Verificação final do manifest
+            # Verifica manifest
             docker compose exec -T web-app bash -c "
               if [ ! -f public/build/manifest.json ]; then
                 echo 'ERRO: manifest.json não foi gerado!'
@@ -126,7 +127,6 @@ jobs:
             docker compose exec -T web-app php artisan view:cache
             docker compose exec -T api-app php artisan optimize
 
-            # Limpeza
             docker image prune -f
 
             echo ""
