@@ -1,30 +1,33 @@
 FROM php:8.2-fpm
 
+# Instala dependências do sistema
 RUN apt-get update && apt-get install -y \
-    openssl \
-    zip \
-    unzip \
     git \
     curl \
     libpng-dev \
     libonig-dev \
     libxml2-dev \
     libzip-dev \
-    libxslt1-dev \
-    && docker-php-ext-install pdo_mysql mbstring xml zip xsl \
+    zip \
+    unzip \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Node.js 20 + latest npm
-RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
-    && apt-get install -y nodejs \
-    && npm install -g npm@latest
+# Instala extensões PHP
+RUN docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip
 
-# Add Composer
+# Instala Redis (ESSA É A LINHA QUE FALTAVA!)
+RUN pecl install redis && docker-php-ext-enable redis
+
+# Instala Node.js 20 + npm
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs
+
+# Composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
-WORKDIR /var/www/html
+WORKDIR /var/www/web
 
-RUN mkdir -p storage/framework/{cache,views,sessions} bootstrap/cache \
-    && chmod -R 777 storage bootstrap/cache
+# Permissões
+RUN chown -R www-data:www-data /var/www/web
 
 CMD ["php-fpm"]
