@@ -23,10 +23,12 @@ jobs:
             echo "BRANCH=main" >> $GITHUB_ENV
             echo "DIR_PATH=/home/deployer/esa-prod" >> $GITHUB_ENV
             echo "ENV_CONTENT=${{ secrets.ENV_PROD }}" >> $GITHUB_ENV
+
           elif [[ "${GITHUB_REF}" == "refs/heads/staging" ]]; then
             echo "BRANCH=staging" >> $GITHUB_ENV
             echo "DIR_PATH=/home/deployer/esa-stage" >> $GITHUB_ENV
             echo "ENV_CONTENT=${{ secrets.ENV_STAGE }}" >> $GITHUB_ENV
+
           else
             echo "BRANCH=dev" >> $GITHUB_ENV
             echo "DIR_PATH=/home/deployer/esa-dev" >> $GITHUB_ENV
@@ -42,10 +44,13 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << EOF
             set -e
-            
+
             DIR_PATH="${{ env.DIR_PATH }}"
             BRANCH="${{ env.BRANCH }}"
             ENV_FILE_CONTENT="${{ env.ENV_CONTENT }}"
+
+            echo "Deploying branch: \$BRANCH"
+            echo "Path: \$DIR_PATH"
 
             # Clone if not exists
             if [ ! -d "\$DIR_PATH" ]; then
@@ -54,48 +59,45 @@ jobs:
 
             cd "\$DIR_PATH"
 
+            echo "--- Pulling new code ---"
             git fetch
             git checkout "\$BRANCH"
             git pull origin "\$BRANCH"
 
-            # Write .env files
+            echo "--- Writing .env files ---"
             echo "\$ENV_FILE_CONTENT" > .env
             cp .env api/.env
             cp .env web/.env
 
-            # Fix names
             sed -i 's/^APP_NAME=.*/APP_NAME=PetCertify_API/' api/.env
             sed -i 's/^APP_NAME=.*/APP_NAME=PetCertify/' web/.env
 
-            # Pre-create Laravel folders
+            echo "--- Creating required Laravel directories ---"
             mkdir -p web/storage/framework/{cache,views,sessions}
             mkdir -p web/bootstrap/cache
             mkdir -p api/storage/framework/{cache,views,sessions}
             mkdir -p api/bootstrap/cache
 
-            # Make sure deployer owns all
-            chown -R deployer:deployer .
-
-            # Docker recreate
+            echo "--- Rebuilding Docker containers ---"
             docker compose down || true
-            docker compose -f docker-compose.yml pull || true
-            docker compose -f docker-compose.yml up -d --build --remove-orphans
+            docker compose pull || true
+            docker compose up -d --build --remove-orphans
 
-            # Delete vendor BEFORE reinstalling (prevent root-owned conflicts)
+            echo "--- Cleaning leftover vendors ---"
             docker compose exec -T web-app rm -rf vendor || true
             docker compose exec -T api-app rm -rf vendor || true
 
-            # Composer install (WEB)
+            echo "--- Installing PHP dependencies (WEB) ---"
             docker compose exec -T web-app composer install --no-dev --optimize-autoloader --no-interaction
 
-            # NPM build (WEB)
+            echo "--- Building frontend (WEB) ---"
             docker compose exec -T web-app npm install
             docker compose exec -T web-app npm run build
 
-            # Composer install (API)
+            echo "--- Installing PHP dependencies (API) ---"
             docker compose exec -T api-app composer install --no-dev --optimize-autoloader --no-interaction
 
-            # Laravel commands WEB
+            echo "--- Running Laravel commands (WEB) ---"
             docker compose exec -T web-app php artisan clear-compiled
             docker compose exec -T web-app php artisan config:clear
             docker compose exec -T web-app php artisan cache:clear
@@ -103,7 +105,7 @@ jobs:
             docker compose exec -T web-app php artisan route:cache
             docker compose exec -T web-app php artisan view:cache
 
-            # Laravel commands API
+            echo "--- Running Laravel commands (API) ---"
             docker compose exec -T api-app php artisan clear-compiled
             docker compose exec -T api-app php artisan config:clear
             docker compose exec -T api-app php artisan cache:clear
@@ -111,9 +113,11 @@ jobs:
             docker compose exec -T api-app php artisan route:cache
             docker compose exec -T api-app php artisan migrate --force
 
-            # Final permissions to www-data
+            echo "--- Fixing permissions inside containers ---"
             docker compose exec -T -u root web-app chown -R www-data:www-data /var/www/html
             docker compose exec -T -u root api-app chown -R www-data:www-data /var/www/html
 
             docker image prune -af || true
+
+            echo "--- DEPLOY FINISHED SUCCESSFULLY ---"
           EOF
