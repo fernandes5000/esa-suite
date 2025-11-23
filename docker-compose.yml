@@ -10,7 +10,7 @@ services:
     restart: unless-stopped
     working_dir: /var/www/web
     volumes:
-      - ./web:/var/www/web
+     - ./web:/var/www/web:cached
     env_file:
       - .env
     networks:
