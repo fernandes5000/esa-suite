@@ -40,74 +40,56 @@ jobs:
 
       - name: Deploy over SSH
         run: |
-          ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << EOF
+          ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
             set -e
 
             DIR_PATH="${{ env.DIR_PATH }}"
             BRANCH="${{ env.BRANCH }}"
             ENV_B64="${{ env.ENV_B64 }}"
 
-            echo "Deploying branch: \$BRANCH"
-            echo "Path: \$DIR_PATH"
+            echo "Deploying to $DIR_PATH (branch: $BRANCH)"
 
-            # Clone if not exists
-            if [ ! -d "\$DIR_PATH/.git" ]; then
-              echo "--- First clone ---"
-              rm -rf "\$DIR_PATH"
-              git clone https://github.com/${{ github.repository }}.git "\$DIR_PATH"
+            if [ ! -d "$DIR_PATH/.git" ]; then
+              echo "First time deploy — cloning..."
+              rm -rf "$DIR_PATH"
+              git clone https://github.com/${{ github.repository }}.git "$DIR_PATH"
             fi
 
-            cd "\$DIR_PATH"
+            cd "$DIR_PATH"
 
-            echo "--- Pulling new code ---"
             git fetch origin
-            git checkout "\$BRANCH"
-            git pull origin "\$BRANCH"
+            git checkout "$BRANCH"
+            git reset --hard origin/$BRANCH
+            git clean -fd
 
-            echo "--- Writing .env files (base64 decoded) ---"
-            echo "\$ENV_B64" | base64 -d > .env
+            echo "$ENV_B64" | base64 -d > .env
             cp .env web/.env
             cp .env api/.env
 
+            # Ajusta nomes dos apps
             sed -i 's/^APP_NAME=.*/APP_NAME=PetCertify_API/' api/.env
             sed -i 's/^APP_NAME=.*/APP_NAME=PetCertify/' web/.env
 
-            echo "--- Creating Laravel directories ---"
-            mkdir -p web/storage/framework/{cache,views,sessions}
-            mkdir -p web/bootstrap/cache
-            mkdir -p api/storage/framework/{cache,views,sessions}
-            mkdir -p api/bootstrap/cache
+            # Corrige URLs da API no .env do frontend
+            sed -i "s|API_BASE_URL=.*|API_BASE_URL=http://api-nginx|" web/.env
+            sed -i "s|API_URL=.*|API_URL=http://api-nginx/api|" web/.env
+            sed -i "s|API_PUBLIC_URL=.*|API_PUBLIC_URL=https://$(echo $DIR_PATH | grep -oE 'esa-(dev|stage|prod)' | sed 's/esa-//').engineer.ninja/api|" web/.env
 
-            echo "--- Rebuilding Docker containers ---"
-            docker compose down || true
-            docker compose up -d --build --remove-orphans
+            echo "Rebuilding containers..."
+            docker compose down --remove-orphans
+            docker compose up -d --build
 
-            echo "--- Cleaning vendor ---"
-            docker compose exec -T web-app rm -rf vendor || true
-            docker compose exec -T api-app rm -rf vendor || true
+            echo "Installing dependencies..."
+            docker compose exec -T web-app composer install --optimize-autoloader --no-dev --no-interaction
+            docker compose exec -T api-app composer install --optimize-autoloader --no-dev --no-interaction
 
-            echo "--- Installing PHP dependencies (WEB) ---"
-            docker compose exec -T web-app composer install --no-dev --optimize-autoloader --no-interaction
+            docker compose exec -T web-app npm install && npm run build
 
-            echo "--- Building frontend (WEB) ---"
-            docker compose exec -T web-app npm install
-            docker compose exec -T web-app npm run build
-
-            echo "--- Installing PHP dependencies (API) ---"
-            docker compose exec -T api-app composer install --no-dev --optimize-autoloader --no-interaction
-
-            echo "--- Laravel optimize commands (WEB) ---"
-            docker compose exec -T web-app php artisan optimize
-
-            echo "--- Laravel migrate + optimize (API) ---"
             docker compose exec -T api-app php artisan migrate --force
+            docker compose exec -T web-app php artisan optimize
             docker compose exec -T api-app php artisan optimize
 
-            echo "--- Fixing permissions ---"
-            docker compose exec -T -u root web-app chown -R www-data:www-data /var/www/html
-            docker compose exec -T -u root api-app chown -R www-data:www-data /var/www/html
+            docker image prune -f
 
-            docker image prune -af || true
-
-            echo "--- DEPLOY FINISHED SUCCESSFULLY ---"
+            echo "Deploy concluído com sucesso!"
           EOF
