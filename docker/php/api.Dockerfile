@@ -18,13 +18,7 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 WORKDIR /var/www/html
 
-COPY . .
-
-RUN mkdir -p storage/framework/cache \
-    storage/framework/sessions \
-    storage/framework/views \
-    bootstrap/cache \
+RUN mkdir -p storage/framework/{cache,views,sessions} bootstrap/cache \
     && chmod -R 777 storage bootstrap/cache
 
-EXPOSE 9000
 CMD ["php-fpm"]
