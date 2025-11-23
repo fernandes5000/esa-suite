@@ -63,9 +63,9 @@ jobs:
             git pull origin "\$BRANCH"
 
             echo "--- Writing .env files ---"
-            echo "\$ENV_FILE_CONTENT" > .env
-            cp .env api/.env
+            echo "$ENV_FILE_CONTENT" > .env
             cp .env web/.env
+            cp .env api/.env
 
             sed -i 's/^APP_NAME=.*/APP_NAME=PetCertify_API/' api/.env
             sed -i 's/^APP_NAME=.*/APP_NAME=PetCertify/' web/.env
