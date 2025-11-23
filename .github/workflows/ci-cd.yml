@@ -23,12 +23,10 @@ jobs:
             echo "BRANCH=main" >> $GITHUB_ENV
             echo "DIR_PATH=/home/deployer/esa-prod" >> $GITHUB_ENV
             echo "ENV_B64=${{ secrets.ENV_PROD_BASE64 }}" >> $GITHUB_ENV
-
           elif [[ "${GITHUB_REF}" == "refs/heads/staging" ]]; then
             echo "BRANCH=staging" >> $GITHUB_ENV
             echo "DIR_PATH=/home/deployer/esa-stage" >> $GITHUB_ENV
             echo "ENV_B64=${{ secrets.ENV_STAGE_BASE64 }}" >> $GITHUB_ENV
-
           else
             echo "BRANCH=dev" >> $GITHUB_ENV
             echo "DIR_PATH=/home/deployer/esa-dev" >> $GITHUB_ENV
@@ -53,21 +51,23 @@ jobs:
             echo "Path: \$DIR_PATH"
 
             # Clone if not exists
-            if [ ! -d "\$DIR_PATH" ]; then
+            if [ ! -d "\$DIR_PATH/.git" ]; then
+              echo "--- First clone ---"
+              rm -rf "\$DIR_PATH"
               git clone https://github.com/${{ github.repository }}.git "\$DIR_PATH"
             fi
 
             cd "\$DIR_PATH"
 
             echo "--- Pulling new code ---"
-            git fetch
+            git fetch origin
             git checkout "\$BRANCH"
             git pull origin "\$BRANCH"
 
             echo "--- Writing .env files (base64 decoded) ---"
             echo "\$ENV_B64" | base64 -d > .env
-            cp .env api/.env
             cp .env web/.env
+            cp .env api/.env
 
             sed -i 's/^APP_NAME=.*/APP_NAME=PetCertify_API/' api/.env
             sed -i 's/^APP_NAME=.*/APP_NAME=PetCertify/' web/.env
@@ -99,7 +99,7 @@ jobs:
             echo "--- Laravel optimize commands (WEB) ---"
             docker compose exec -T web-app php artisan optimize
 
-            echo "--- Laravel optimize commands (API) ---"
+            echo "--- Laravel migrate + optimize (API) ---"
             docker compose exec -T api-app php artisan migrate --force
             docker compose exec -T api-app php artisan optimize
 
