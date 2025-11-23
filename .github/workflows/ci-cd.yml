@@ -58,6 +58,9 @@ jobs:
             git pull origin "\$BRANCH"
 
             echo "\$ENV_FILE_CONTENT" | sed 's/\r$//' > .env
+
+            chmod -R u+rw web api
+
             cp .env api/.env
             cp .env web/.env
 
@@ -69,6 +72,7 @@ jobs:
             mkdir -p api/storage/framework/cache api/storage/framework/views api/storage/framework/sessions
             mkdir -p api/bootstrap/cache
 
+            docker compose down || true
             docker compose -f docker-compose.yml pull || true
             docker compose -f docker-compose.yml up -d --build --remove-orphans
 
