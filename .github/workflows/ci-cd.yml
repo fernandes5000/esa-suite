@@ -85,7 +85,7 @@ jobs:
             sudo chmod -R 775 web/storage api/storage web/bootstrap/cache api/bootstrap/cache
 
             # Full Docker rebuild
-            docker compose down --remove-orphans --volumes --timeout 30 || true
+            docker compose down --remove-orphans --timeout 30 || true
             docker compose up -d --build --force-recreate
 
             # Composer install (production)
