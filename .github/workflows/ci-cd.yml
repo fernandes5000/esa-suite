@@ -45,81 +45,117 @@ jobs:
           ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
             set -e
 
-            cd "${{ env.DIR_PATH }}"
+            DIR_PATH="${{ env.DIR_PATH }}"
+            BRANCH="${{ env.BRANCH }}"
+            ENV_B64="${{ env.ENV_B64 }}"
 
-            # Git reset
+            echo "Deploying to $DIR_PATH (branch: $BRANCH)"
+            cd "$DIR_PATH"
+
+            # Full git reset
             sudo git clean -fdx
             sudo git reset --hard
             git fetch --all --prune --quiet
-            git checkout "${{ env.BRANCH }}" --force
-            git reset --hard "origin/${{ env.BRANCH }}"
+            git checkout "$BRANCH" --force
+            git reset --hard "origin/$BRANCH"
 
-            # Domain
-            case "${{ env.DIR_PATH }}" in
-              *esa-dev*)   DOMAIN="esa-dev.engineer.ninja" ;;
-              *esa-stage*) DOMAIN="esa-stage.engineer.ninja" ;;
-              *)           DOMAIN="esa.engineer.ninja" ;;
-            esac
+            # Dynamic domain
+            if echo "$DIR_PATH" | grep -q "esa-dev"; then
+              DOMAIN="esa-dev.engineer.ninja"
+            elif echo "$DIR_PATH" | grep -q "esa-stage"; then
+              DOMAIN="esa-stage.engineer.ninja"
+            else
+              DOMAIN="esa.engineer.ninja"
+            fi
 
-            # .env
-            echo "${{ env.ENV_B64 }}" | base64 -d > .env
-            cp .env web/.env api/.env
+            # .env distribution and overrides
+            echo "$ENV_B64" | base64 -d > .env
+            cp .env web/.env
+            cp .env api/.env
             sed -i 's/^APP_NAME=.*/APP_NAME=PetCertify_API/' api/.env
             sed -i 's/^APP_NAME=.*/APP_NAME=PetCertify/' web/.env
             sed -i "s|API_BASE_URL=.*|API_BASE_URL=http://api-nginx|" web/.env
             sed -i "s|API_URL=.*|API_URL=http://api-nginx/api|" web/.env
             sed -i "s|API_PUBLIC_URL=.*|API_PUBLIC_URL=https://$DOMAIN/api|" web/.env
 
-            # Permissions
+            # Storage & permissions
             mkdir -p web/storage/framework/{cache,data,sessions,views} web/storage/logs web/bootstrap/cache
             mkdir -p api/storage/framework/{cache,data,sessions,views} api/storage/logs api/bootstrap/cache
             sudo chown -R www-data:www-data web/storage api/storage web/bootstrap/cache api/bootstrap/cache
             sudo chmod -R 775 web/storage api/storage web/bootstrap/cache api/bootstrap/cache
 
-            # Docker
+            # Docker rebuild
             docker compose down --remove-orphans --timeout 30 || true
             docker compose up -d --build --force-recreate
-            sleep 15
 
-            # Composer (critical — no -T, full visibility)
+            # Composer install (production)
             docker compose exec web-app composer install --optimize-autoloader --no-dev --no-interaction || \
-              (echo "WEB COMPOSER FAILED" && docker compose logs web-app && exit 1)
+              (echo "WEB COMPOSER FAILED!" && docker compose logs web-app | tail -50 && exit 1)
 
             docker compose exec api-app composer install --optimize-autoloader --no-dev --no-interaction || \
-              (echo "API COMPOSER FAILED" && docker compose logs api-app && exit 1)
+              (echo "API COMPOSER FAILED! Dumping logs..." && docker compose logs api-app | tail -100 && exit 1)
 
-            # Database — dev = fresh, others = normal
-            if echo "${{ env.DIR_PATH }}" | grep -q "esa-dev"; then
-              echo "DEV: Running migrate:fresh --seed"
-              docker compose exec api-app php artisan migrate:fresh --seed --force --verbose || \
-                (echo "FRESH FAILED" && docker compose logs api-app && exit 1)
-            else
-              echo "Running standard migrate"
-              docker compose exec api-app php artisan migrate --force --verbose || \
-                (echo "MIGRATE FAILED" && docker compose logs api-app && exit 1)
-              docker compose exec api-app php artisan db:seed --force --verbose || true
-            fi
+             # Migrations + seed
 
-            # Vite build
+            docker compose down --remove-orphans --timeout 30 || true
+            docker compose up -d --build --force-recreate mysql api-app
+            sleep 10
+
+            docker compose exec api-app php artisan migrate --force --verbose || \
+              (echo "MIGRATIONS FAILED! Dumping logs..." && docker compose logs api-app | tail -100 && exit 1)
+
+            docker compose exec api-app php artisan db:seed --force --verbose || \
+              echo "No new seeders"
+
+            # VITE BUILD ON HOST
+            echo "Running Vifte build on host..."
             cd web
             rm -rf node_modules package-lock.json .vite public/build public/hot
             npm ci --legacy-peer-deps
-            npm run build || npm run build -- --force
-            [ -f "public/build/manifest.json" ] || (echo "VITE FAILED" && exit 1)
-            echo "Vite build OK"
+            echo "First build attempt..."
+            npm run build || echo "First build failed, forcing with --force..."
+            if [ ! -f "public/build/manifest.json" ]; then
+              echo "manifest.json not generated. Forcing rebuild..."
+              rm -rf node_modules .vite public/build
+              npm ci --legacy-peer-deps
+              npm run build -- --force
+            fi
+            if [ -f "public/build/manifest.json" ]; then
+              echo "VITE BUILD SUCCESSFUL! manifest.json generated"
+              echo "Size: $(du -h public/build/manifest.json | cut -f1)"
+            else
+              echo "FATAL ERROR: manifest.json still not generated!"
+              ls -la public/build/ || echo "public/build directory missing"
+              exit 1
+            fi
             cd ..
 
-            # Laravel cache
+            # DATABASE: migrations + seeds
+            echo "Running migrations on API..."
+            docker compose exec api-app php artisan migrate --force --verbose || \
+              (echo "MIGRATION FAILED! Dumping api-app logs:" && \
+               docker compose logs --tail=100 api-app && exit 1)
+
+            echo "Running seeds on API..."
+            docker compose exec api-app php artisan db:seed --force --verbose || \
+              echo "No new seeders or already seeded"
+
+            # Laravel finalization
             docker compose exec -T web-app php artisan optimize:clear
             docker compose exec -T web-app php artisan config:cache
             docker compose exec -T web-app php artisan route:cache
             docker compose exec -T web-app php artisan view:cache
             docker compose exec -T api-app php artisan optimize
 
-            # Final message
+            # Cleanup
+            docker image prune -f -a || true
+
+            echo ""
             echo "=================================================="
-            echo "   DEPLOY SUCCESSFUL!"
+            echo "   DEPLOY 100% COMPLETED SUCCESSFULLY!"
             echo "   Site  → https://$DOMAIN"
             echo "   API   → https://$DOMAIN/api"
+            echo "   Adminer → https://$(hostname -I | awk '{print $1}'):8082"
             echo "=================================================="
+            echo ""
           EOF
