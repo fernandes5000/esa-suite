@@ -39,7 +39,7 @@ jobs:
       - name: Deploy over SSH
         run: |
           ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
-            set -e
+            set -e  # Para o deploy se qualquer comando falhar
 
             DIR_PATH="${{ env.DIR_PATH }}"
             BRANCH="${{ env.BRANCH }}"
@@ -48,14 +48,14 @@ jobs:
             echo "Deploying to $DIR_PATH (branch: $BRANCH)"
             cd "$DIR_PATH"
 
-            # Git — corrigido o erro fatal
+            # === GIT: limpeza total e checkout correto ===
             sudo git clean -fdx
             sudo git reset --hard
             git fetch --all --prune --quiet
             git checkout "$BRANCH" --force
-            git reset --hard "origin/$BRANCH" --quiet
+            git reset --hard "origin/$BRANCH"
 
-            # Domínio
+            # === Domínio automático ===
             if echo "$DIR_PATH" | grep -q "esa-dev"; then
               DOMAIN="esa-dev.engineer.ninja"
             elif echo "$DIR_PATH" | grep -q "esa-stage"; then
@@ -64,43 +64,52 @@ jobs:
               DOMAIN="esa.engineer.ninja"
             fi
 
-            # .env
+            # === .env ===
             echo "$ENV_B64" | base64 -d > .env
             cp .env web/.env
             cp .env api/.env
+
             sed -i 's/^APP_NAME=.*/APP_NAME=PetCertify_API/' api/.env
             sed -i 's/^APP_NAME=.*/APP_NAME=PetCertify/' web/.env
             sed -i "s|API_BASE_URL=.*|API_BASE_URL=http://api-nginx|" web/.env
             sed -i "s|API_URL=.*|API_URL=http://api-nginx/api|" web/.env
             sed -i "s|API_PUBLIC_URL=.*|API_PUBLIC_URL=https://$DOMAIN/api|" web/.env
 
-            # Storage
+            # === Storage & permissões ===
             mkdir -p web/storage/framework/{cache,data,sessions,views} web/storage/logs web/bootstrap/cache
             mkdir -p api/storage/framework/{cache,data,sessions,views} api/storage/logs api/bootstrap/cache
             sudo chown -R www-data:www-data web/storage api/storage web/bootstrap/cache api/bootstrap/cache
             sudo chmod -R 775 web/storage api/storage web/bootstrap/cache api/bootstrap/cache
 
-            # Containers
+            # === Docker: rebuild total ===
             docker compose down --remove-orphans --volumes --timeout 30 || true
             docker compose up -d --build --force-recreate
 
-            # Composer
+            # === Composer ===
             docker compose exec -T web-app composer install --optimize-autoloader --no-dev --no-interaction
             docker compose exec -T api-app composer install --optimize-autoloader --no-dev --no-interaction
 
-            # VITE BUILD NO HOST 
-            echo "Build do Vite direto no host..."
+            # === VITE BUILD NO HOST (a parte mais importante) ===
+            echo "Executando Vite build direto no host (Node.js instalado no servidor)..."
             cd web
             rm -rf node_modules package-lock.json public/build public/hot .vite
+
             npm install --legacy-peer-deps --no-save
-            npm run build || npm run build -- --force
 
-            # Verificação final
-            [ -f "public/build/manifest.json" ] && echo "manifest.json gerado com sucesso!" || (echo "ERRO: manifest.json não encontrado!" && ls -la public/build/ && exit 1)
+            echo "npm run build..."
+            npm run build || (echo "Tentando com --force..." && npm run build -- --force)
 
+            # Verificação obrigatória
+            if [ ! -f "public/build/manifest.json" ]; then
+              echo "ERRO: manifest.json NÃO foi gerado!"
+              ls -la public/build/ || echo "Pasta public/build não existe"
+              exit 1
+            fi
+
+            echo "VITE BUILD CONCLUÍDO COM SUCESSO! manifest.json presente"
             cd ..
 
-            # Laravel
+            # === Laravel final ===
             docker compose exec -T api-app php artisan migrate --force
             docker compose exec -T web-app php artisan optimize:clear
             docker compose exec -T web-app php artisan config:cache
@@ -108,12 +117,14 @@ jobs:
             docker compose exec -T web-app php artisan view:cache
             docker compose exec -T api-app php artisan optimize
 
+            # Limpeza de imagens antigas
             docker image prune -f -a
 
             echo ""
             echo "=================================================="
-            echo "   DEPLOY CONCLUÍDO COM SUCESSO!"
-            echo "   Site: https://$DOMAIN"
-            echo "   API : https://$DOMAIN/api"
+            echo "   DEPLOY 100% CONCLUÍDO E FUNCIONAL!"
+            echo "   Site → https://$DOMAIN"
+            echo "   API  → https://$DOMAIN/api"
             echo "=================================================="
+            echo ""
           EOF
