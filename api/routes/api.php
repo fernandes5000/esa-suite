@@ -16,59 +16,59 @@ use App\Http\Controllers\Api\V1\Therapist\RequestController;
 
 Route::prefix('v1')->group(function () {
 
-    // --- Public Auth Routes ---
-    
-    Route::post('/auth/register', [AuthController::class, 'register']);
-    
-    Route::post('/auth/login', [AuthController::class, 'login']);
-
-    Route::get('/esa-request/{esaRequest}/download', [RequestController::class, 'downloadPdf']);
-    
-    // --- Protected Routes (Require Sanctum token) ---
-    Route::middleware('auth:sanctum')->group(function () {
-
-     // --- Therapist Routes ---
-     Route::prefix('therapist')
-               ->name('therapist.')
-               ->middleware(['permission:requests.view.assigned,sanctum']) 
-               ->group(function () {
-          
-          Route::get('/requests', [RequestController::class, 'index']);
-          
-          Route::post('/requests/{esaRequest}/approve', [RequestController::class, 'approve']);
-     });
+     // --- Public Auth Routes ---
      
-        // --- User-Specific Routes ---
-        
-        Route::post('/auth/logout', [AuthController::class, 'logout']);
-        
-        Route::post('/pets/{pet}/photo', [PetController::class, 'uploadPhoto']);
+     Route::post('/auth/register', [AuthController::class, 'register']);
+     
+     Route::post('/auth/login', [AuthController::class, 'login']);
 
-        Route::get('/esa-request/active', [EsaRequestController::class, 'getActiveOrCreateRequest'])
-             ->name('esa-request.active');
+     Route::get('/esa-request/{esaRequest}/download', [RequestController::class, 'downloadPdf']);
+     
+     // --- Protected Routes (Require Sanctum token) ---
+     Route::middleware('auth:sanctum')->group(function () {
 
-        Route::put('/esa-request/{esaRequest}', [EsaRequestController::class, 'update'])
-             ->name('esa-request.update');
+          // --- Therapist Routes ---
+          Route::prefix('therapist')
+                    ->name('therapist.')
+                    ->middleware(['permission:requests.view.assigned,sanctum']) 
+                    ->group(function () {
+               
+               Route::get('/requests', [RequestController::class, 'index']);
+               
+               Route::post('/requests/{esaRequest}/approve', [RequestController::class, 'approve']);
+          });
+     
+          // --- User-Specific Routes ---
+          
+          Route::post('/auth/logout', [AuthController::class, 'logout']);
+          
+          Route::post('/pets/{pet}/photo', [PetController::class, 'uploadPhoto']);
 
-        Route::post('/esa-request/{esaRequest}/pets', [EsaRequestController::class, 'syncPets'])
-             ->name('esa-request.sync-pets');
-        
-        Route::apiResource('/pets', PetController::class);
+          Route::get('/esa-request/active', [EsaRequestController::class, 'getActiveOrCreateRequest'])
+               ->name('esa-request.active');
 
-        
-        // --- Admin-Only Routes ---
+          Route::put('/esa-request/{esaRequest}', [EsaRequestController::class, 'update'])
+               ->name('esa-request.update');
 
-        Route::prefix('admin') 
-             ->name('admin.')
-             ->middleware(['permission:admin.users.manage,sanctum'])
-             ->group(function () {
-            
-            Route::get('/users', [AdminUserController::class, 'index'])->name('users.index');
-            
-            Route::get('/users/{user}', [AdminUserController::class, 'show'])->name('users.show');
+          Route::post('/esa-request/{esaRequest}/pets', [EsaRequestController::class, 'syncPets'])
+               ->name('esa-request.sync-pets');
+          
+          Route::apiResource('/pets', PetController::class);
 
-            Route::put('/users/{user}', [AdminUserController::class, 'update'])->name('users.update');
-        });
+          
+          // --- Admin-Only Routes ---
 
-    });
+          Route::prefix('admin') 
+               ->name('admin.')
+               ->middleware(['permission:admin.users.manage,sanctum'])
+               ->group(function () {
+               
+               Route::get('/users', [AdminUserController::class, 'index'])->name('users.index');
+               
+               Route::get('/users/{user}', [AdminUserController::class, 'show'])->name('users.show');
+
+               Route::put('/users/{user}', [AdminUserController::class, 'update'])->name('users.update');
+          });
+
+     });
 });
