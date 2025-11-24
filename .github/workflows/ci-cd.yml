@@ -48,14 +48,14 @@ jobs:
             echo "Deploying to $DIR_PATH (branch: $BRANCH)"
             cd "$DIR_PATH"
 
-            # Git reset total
+            # Git — corrigido o erro fatal
             sudo git clean -fdx
             sudo git reset --hard
             git fetch --all --prune --quiet
-            git checkout "$BRANCH_BRANCH" --force
+            git checkout "$BRANCH" --force
             git reset --hard "origin/$BRANCH" --quiet
 
-            # Domínio automático
+            # Domínio
             if echo "$DIR_PATH" | grep -q "esa-dev"; then
               DOMAIN="esa-dev.engineer.ninja"
             elif echo "$DIR_PATH" | grep -q "esa-stage"; then
@@ -68,7 +68,6 @@ jobs:
             echo "$ENV_B64" | base64 -d > .env
             cp .env web/.env
             cp .env api/.env
-
             sed -i 's/^APP_NAME=.*/APP_NAME=PetCertify_API/' api/.env
             sed -i 's/^APP_NAME=.*/APP_NAME=PetCertify/' web/.env
             sed -i "s|API_BASE_URL=.*|API_BASE_URL=http://api-nginx|" web/.env
@@ -89,27 +88,16 @@ jobs:
             docker compose exec -T web-app composer install --optimize-autoloader --no-dev --no-interaction
             docker compose exec -T api-app composer install --optimize-autoloader --no-dev --no-interaction
 
-            # VITE BUILD DIRETO NO HOST (a solução que NUNCA falha)
-            echo "Executando Vite build direto no host com Node.js local..."
+            # VITE BUILD NO HOST 
+            echo "Build do Vite direto no host..."
             cd web
-
             rm -rf node_modules package-lock.json public/build public/hot .vite
             npm install --legacy-peer-deps --no-save
-
-            echo "Rodando npm run build..."
-            if ! npm run build; then
-              echo "Primeira tentativa falhou, tentando com --force..."
-              npm run build -- --force || (echo "Vite build falhou mesmo com --force" && exit 1)
-            fi
+            npm run build || npm run build -- --force
 
             # Verificação final
-            if [ ! -f "public/build/manifest.json" ]; then
-              echo "ERRO: manifest.json não foi gerado!"
-              ls -la public/build/ || echo "Pasta public/build não existe"
-              exit 1
-            fi
+            [ -f "public/build/manifest.json" ] && echo "manifest.json gerado com sucesso!" || (echo "ERRO: manifest.json não encontrado!" && ls -la public/build/ && exit 1)
 
-            echo "VITE BUILD CONCLUÍDO COM SUCESSO! manifest.json gerado no host"
             cd ..
 
             # Laravel
@@ -124,9 +112,8 @@ jobs:
 
             echo ""
             echo "=================================================="
-            echo "   DEPLOY 100% CONCLUÍDO!"
+            echo "   DEPLOY CONCLUÍDO COM SUCESSO!"
             echo "   Site: https://$DOMAIN"
-            echo "   API:  https://$DOMAIN/api"
+            echo "   API : https://$DOMAIN/api"
             echo "=================================================="
-            echo ""
           EOF
