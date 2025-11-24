@@ -52,7 +52,7 @@ jobs:
             echo "Deploying to $DIR_PATH (branch: $BRANCH)"
             cd "$DIR_PATH"
 
-            # Full git reset
+            # Git reset
             sudo git clean -fdx
             sudo git reset --hard
             git fetch --all --prune --quiet
@@ -68,7 +68,7 @@ jobs:
               DOMAIN="esa.engineer.ninja"
             fi
 
-            # .env distribution and overrides
+            # .env distribution — BEFORE docker up (critical)
             echo "$ENV_B64" | base64 -d > .env
             cp .env web/.env
             cp .env api/.env
@@ -87,28 +87,29 @@ jobs:
             # Docker rebuild
             docker compose down --remove-orphans --timeout 30 || true
             docker compose up -d --build --force-recreate
+            sleep 15
 
-            # Composer install (production)
+            # Composer install — visible output, fail fast
             docker compose exec web-app composer install --optimize-autoloader --no-dev --no-interaction || \
-              (echo "WEB COMPOSER FAILED!" && docker compose logs web-app | tail -50 && exit 1)
+              (echo "WEB COMPOSER FAILED" && docker compose logs web-app && exit 1)
 
             docker compose exec api-app composer install --optimize-autoloader --no-dev --no-interaction || \
-              (echo "API COMPOSER FAILED! Dumping logs..." && docker compose logs api-app | tail -100 && exit 1)
+              (echo "API COMPOSER FAILED" && docker compose logs api-app && exit 1)
 
-             # Migrations + seed
+            # Database — dev = fresh, others = normal
+            if echo "$DIR_PATH" | grep -q "esa-dev"; then
+              echo "DEV: Running migrate:fresh --seed"
+              docker compose exec api-app php artisan migrate:fresh --seed --force --verbose || \
+                (echo "MIGRATE:FRESH FAILED" && docker compose logs api-app && exit 1)
+            else
+              echo "Running normal migrate"
+              docker compose exec api-app php artisan migrate --force --verbose || \
+                (echo "MIGRATE FAILED" && docker compose logs api-app && exit 1)
+              docker compose exec api-app php artisan db:seed --force --verbose || echo "No new seeders"
+            fi
 
-            docker compose down --remove-orphans --timeout 30 || true
-            docker compose up -d --build --force-recreate mysql api-app
-            sleep 10
-
-            docker compose exec api-app php artisan migrate --force --verbose || \
-              (echo "MIGRATIONS FAILED! Dumping logs..." && docker compose logs api-app | tail -100 && exit 1)
-
-            docker compose exec api-app php artisan db:seed --force --verbose || \
-              echo "No new seeders"
-
-            # VITE BUILD ON HOST
-            echo "Running Vifte build on host..."
+            # Vite build on host (your original, bulletproof)
+            echo "Running Vite build on host..."
             cd web
             rm -rf node_modules package-lock.json .vite public/build public/hot
             npm ci --legacy-peer-deps
@@ -122,25 +123,14 @@ jobs:
             fi
             if [ -f "public/build/manifest.json" ]; then
               echo "VITE BUILD SUCCESSFUL! manifest.json generated"
-              echo "Size: $(du -h public/build/manifest.json | cut -f1)"
             else
-              echo "FATAL ERROR: manifest.json still not generated!"
-              ls -la public/build/ || echo "public/build directory missing"
+              echo "FATAL: manifest.json still not generated!"
+              ls -la public/build/ || true
               exit 1
             fi
             cd ..
 
-            # DATABASE: migrations + seeds
-            echo "Running migrations on API..."
-            docker compose exec api-app php artisan migrate --force --verbose || \
-              (echo "MIGRATION FAILED! Dumping api-app logs:" && \
-               docker compose logs --tail=100 api-app && exit 1)
-
-            echo "Running seeds on API..."
-            docker compose exec api-app php artisan db:seed --force --verbose || \
-              echo "No new seeders or already seeded"
-
-            # Laravel finalization
+            # Laravel cache
             docker compose exec -T web-app php artisan optimize:clear
             docker compose exec -T web-app php artisan config:cache
             docker compose exec -T web-app php artisan route:cache
