@@ -89,8 +89,18 @@ jobs:
             docker compose up -d --build --force-recreate
 
             # Composer install (production)
-            docker compose exec -T web-app composer install --optimize-autoloader --no-dev --no-interaction
-            docker compose exec -T api-app composer install --optimize-autoloader --no-dev --no-interaction
+            docker compose exec web-app composer install --optimize-autoloader --no-dev --no-interaction || \
+              (echo "WEB COMPOSER FAILED!" && docker compose logs web-app | tail -50 && exit 1)
+
+            docker compose exec api-app composer install --optimize-autoloader --no-dev --no-interaction || \
+              (echo "API COMPOSER FAILED! Dumping logs..." && docker compose logs api-app | tail -100 && exit 1)
+
+             # Migrations + seed
+            docker compose exec api-app php artisan migrate --force --verbose || \
+              (echo "MIGRATIONS FAILED! Dumping logs..." && docker compose logs api-app | tail -100 && exit 1)
+
+            docker compose exec api-app php artisan db:seed --force --verbose || \
+              echo "No new seeders"
 
             # VITE BUILD ON HOST
             echo "Running Vifte build on host..."
