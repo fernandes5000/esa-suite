@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>PetCertify - @yield('title')</title>
     
-    <link href="/css/tailwind.css" rel="stylesheet">
+    <link href="{{ asset('css/tailwind.css') }}?v={{ filemtime(public_path('css/tailwind.css')) }}" rel="stylesheet">
     @livewireStyles
 </head>
 <body class="bg-gray-50">
@@ -21,6 +21,6 @@
     </div>
 
     @livewireScripts
-    <script src="/js/alpine.js" defer></script>
+    <script src="{{ asset('js/alpine.js') }}?v={{ filemtime(public_path('js/alpine.js')) }}" defer></script>
 </body>
 </html>
