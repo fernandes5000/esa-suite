@@ -90,10 +90,10 @@ jobs:
 
             # Composer install (production)
             docker compose exec -T web-app composer install --optimize-autoloader --no-dev --no-interaction
-            docker compose exec:exec -T api-app composer install --optimize-autoloader --no-dev --no-interaction
+            docker compose exec -T api-app composer install --optimize-autoloader --no-dev --no-interaction
 
             # VITE BUILD ON HOST
-            echo "Running Vite build on host..."
+            echo "Running Vifte build on host..."
             cd web
             rm -rf node_modules package-lock.json .vite public/build public/hot
             npm ci --legacy-peer-deps
