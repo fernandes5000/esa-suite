@@ -96,6 +96,11 @@ jobs:
               (echo "API COMPOSER FAILED! Dumping logs..." && docker compose logs api-app | tail -100 && exit 1)
 
              # Migrations + seed
+
+            docker compose down --remove-orphans --timeout 30 || true
+            docker compose up -d --build --force-recreate mysql api-app
+            sleep 10
+
             docker compose exec api-app php artisan migrate --force --verbose || \
               (echo "MIGRATIONS FAILED! Dumping logs..." && docker compose logs api-app | tail -100 && exit 1)
 
