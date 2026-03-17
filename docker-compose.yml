@@ -12,7 +12,7 @@ services:
     volumes:
      - ./web:/var/www/web:cached
     env_file:
-      - .env
+      - ./web/.env
     networks:
       - esa-network
     depends_on:
@@ -52,7 +52,7 @@ services:
     volumes:
       - ./api:/var/www/api
     env_file:
-      - .env
+      - ./api/.env
     networks:
       - esa-network
     depends_on:

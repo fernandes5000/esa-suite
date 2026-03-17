@@ -36,7 +36,7 @@ return [
     ],
 
     'api' => [
-        'url' => env('API_URL', 'http://esa-api-nginx/api'),
+        'url' => env('API_URL', 'http://api-nginx/api'),
         'public_url' => env('API_PUBLIC_URL', 'http://localhost:8081/api'),
     ],
 
