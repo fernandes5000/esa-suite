@@ -10,7 +10,7 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
 
     steps:
       - name: Checkout code
@@ -72,8 +72,10 @@ jobs:
             echo "$ENV_B64" | base64 -d > .env
             cp .env web/.env
             cp .env api/.env
+
             sed -i 's/^APP_NAME=.*/APP_NAME=PetCertify_API/' api/.env
             sed -i 's/^APP_NAME=.*/APP_NAME=PetCertify/' web/.env
+
             sed -i "s|API_BASE_URL=.*|API_BASE_URL=http://api-nginx|" web/.env
             sed -i "s|API_URL=.*|API_URL=http://api-nginx/api|" web/.env
             sed -i "s|API_PUBLIC_URL=.*|API_PUBLIC_URL=https://$DOMAIN/api|" web/.env
@@ -134,17 +136,21 @@ jobs:
             if [ "$WEB_STATUS" != "running" ] || [ "$API_STATUS" != "running" ]; then
               echo "One or more app containers are not running."
               docker compose ps
+              echo "=== web-app logs ==="
               docker compose logs web-app || true
+              echo "=== api-app logs ==="
               docker compose logs api-app || true
               exit 1
             fi
 
             # Composer install
-            echo "=== WEB: composer install ==="
+            echo "=== WEB: composer install START ==="
             docker compose exec -T web-app sh -lc "cd /var/www/web && COMPOSER_ALLOW_SUPERUSER=1 composer install --optimize-autoloader --no-dev --no-interaction"
+            echo "=== WEB: composer install DONE ==="
 
-            echo "=== API: composer install ==="
+            echo "=== API: composer install START ==="
             docker compose exec -T api-app sh -lc "cd /var/www/api && COMPOSER_ALLOW_SUPERUSER=1 composer install --optimize-autoloader --no-dev --no-interaction"
+            echo "=== API: composer install DONE ==="
 
             # Validate vendor
             echo "=== WEB: validate vendor ==="
@@ -164,23 +170,35 @@ jobs:
             fi
 
             # Vite build on host
-            echo "Running Vite build on host..."
+            echo "=== WEB: build assets START ==="
             cd web
             rm -rf node_modules .vite public/build public/hot
             npm ci --legacy-peer-deps
             npm run build
             test -f public/build/manifest.json
             cd ..
+            echo "=== WEB: build assets DONE ==="
 
             # Laravel cache
+            echo "=== WEB: cache START ==="
             docker compose exec -T web-app php artisan optimize:clear
             docker compose exec -T web-app php artisan config:cache
             docker compose exec -T web-app php artisan route:cache
             docker compose exec -T web-app php artisan view:cache
+            echo "=== WEB: cache DONE ==="
 
+            echo "=== API: cache START ==="
             docker compose exec -T api-app php artisan optimize:clear
             docker compose exec -T api-app php artisan config:cache
             docker compose exec -T api-app php artisan route:cache
+            echo "=== API: cache DONE ==="
+
+            # Final checks
+            echo "=== FINAL CHECK: WEB autoload ==="
+            docker compose exec -T web-app sh -lc "cd /var/www/web && test -f vendor/autoload.php"
+
+            echo "=== FINAL CHECK: API autoload ==="
+            docker compose exec -T api-app sh -lc "cd /var/www/api && test -f vendor/autoload.php"
 
             # Cleanup
             docker image prune -f -a || true
