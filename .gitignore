@@ -42,8 +42,5 @@ bootstrap/cache/*.php
 api/vendor/
 web/vendor/
 
-# Composer
-composer.lock
-
 # Misc
 *.cache
