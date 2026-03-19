@@ -52,14 +52,14 @@ jobs:
             echo "Deploying to $DIR_PATH (branch: $BRANCH)"
             cd "$DIR_PATH"
 
-            # Git reset
+            # 1. Git Cleanup & Update
             sudo git clean -fdx
             sudo git reset --hard
             git fetch --all --prune --quiet
             git checkout "$BRANCH" --force
             git reset --hard "origin/$BRANCH"
 
-            # Dynamic domain
+            # 2. Dynamic domain detection
             if echo "$DIR_PATH" | grep -q "esa-dev"; then
               DOMAIN="esa-dev.engineer.ninja"
             elif echo "$DIR_PATH" | grep -q "esa-stage"; then
@@ -68,7 +68,7 @@ jobs:
               DOMAIN="esa.engineer.ninja"
             fi
 
-            # .env distribution
+            # 3. Environment Setup
             echo "$ENV_B64" | base64 -d > .env
             cp .env web/.env
             cp .env api/.env
@@ -80,134 +80,62 @@ jobs:
             sed -i "s|API_URL=.*|API_URL=http://api-nginx/api|" web/.env
             sed -i "s|API_PUBLIC_URL=.*|API_PUBLIC_URL=https://$DOMAIN/api|" web/.env
 
-            # Storage & permissions
+            # 4. Storage & permissions setup
             mkdir -p web/storage/framework/{cache,data,sessions,views} web/storage/logs web/bootstrap/cache
             mkdir -p api/storage/framework/{cache,data,sessions,views} api/storage/logs api/bootstrap/cache
             sudo chown -R www-data:www-data web/storage api/storage web/bootstrap/cache api/bootstrap/cache
             sudo chmod -R 775 web/storage api/storage web/bootstrap/cache api/bootstrap/cache
 
-            # Docker rebuild
+            # 5. Docker Rebuild
             docker compose down --remove-orphans --timeout 30 || true
             docker compose up -d --build --force-recreate
 
-            echo "=== CONTAINER STATUS AFTER UP ==="
-            docker compose ps
+            echo "=== WAITING FOR CONTAINERS TO BE READY ==="
+            sleep 5
 
-            echo "=== WAITING FOR web-app AND api-app ==="
-            for i in $(seq 1 30); do
-              WEB_CID=$(docker compose ps -q web-app || true)
-              API_CID=$(docker compose ps -q api-app || true)
-
-              WEB_STATUS="missing"
-              API_STATUS="missing"
-
-              if [ -n "${WEB_CID:-}" ]; then
-                WEB_STATUS=$(docker inspect -f '{{.State.Status}}' "$WEB_CID" 2>/dev/null || echo "missing")
-              fi
-
-              if [ -n "${API_CID:-}" ]; then
-                API_STATUS=$(docker inspect -f '{{.State.Status}}' "$API_CID" 2>/dev/null || echo "missing")
-              fi
-
-              echo "Attempt $i: web-app=$WEB_STATUS api-app=$API_STATUS"
-
-              if [ "$WEB_STATUS" = "running" ] && [ "$API_STATUS" = "running" ]; then
-                echo "Both app containers are running."
-                break
-              fi
-
-              sleep 2
-            done
-
-            WEB_CID=$(docker compose ps -q web-app || true)
-            API_CID=$(docker compose ps -q api-app || true)
-
-            WEB_STATUS="missing"
-            API_STATUS="missing"
-
-            if [ -n "${WEB_CID:-}" ]; then
-              WEB_STATUS=$(docker inspect -f '{{.State.Status}}' "$WEB_CID" 2>/dev/null || echo "missing")
-            fi
-
-            if [ -n "${API_CID:-}" ]; then
-              API_STATUS=$(docker inspect -f '{{.State.Status}}' "$API_CID" 2>/dev/null || echo "missing")
-            fi
-
-            if [ "$WEB_STATUS" != "running" ] || [ "$API_STATUS" != "running" ]; then
-              echo "One or more app containers are not running."
-              docker compose ps
-              echo "=== web-app logs ==="
-              docker compose logs web-app || true
-              echo "=== api-app logs ==="
-              docker compose logs api-app || true
-              exit 1
-            fi
-
-            # Composer install
+            # 6. Composer Install - WEB
             echo "=== WEB: composer install START ==="
-            docker compose exec -T web-app sh -lc "cd /var/www/web && COMPOSER_ALLOW_SUPERUSER=1 composer install --optimize-autoloader --no-dev --no-interaction"
+            docker compose exec -T web-app sh -c "cd /var/www/web && COMPOSER_ALLOW_SUPERUSER=1 composer install --optimize-autoloader --no-dev --no-interaction"
             echo "=== WEB: composer install DONE ==="
 
+            # 7. Composer Install - API
             echo "=== API: composer install START ==="
-            docker compose exec -T api-app sh -lc "cd /var/www/api && COMPOSER_ALLOW_SUPERUSER=1 composer install --optimize-autoloader --no-dev --no-interaction"
+            docker compose exec -T api-app sh -c "cd /var/www/api && COMPOSER_ALLOW_SUPERUSER=1 composer install --optimize-autoloader --no-dev --no-interaction"
             echo "=== API: composer install DONE ==="
 
-            # Validate vendor
-            echo "=== WEB: validate vendor ==="
-            docker compose exec -T web-app sh -lc "cd /var/www/web && test -f vendor/autoload.php"
-
-            echo "=== API: validate vendor ==="
-            docker compose exec -T api-app sh -lc "cd /var/www/api && test -f vendor/autoload.php"
-
-            # Database
+            # 8. Database Migrations
             if echo "$DIR_PATH" | grep -q "esa-dev"; then
-              echo "DEV: Running migrate:fresh --seed"
-              docker compose exec -T api-app php artisan migrate:fresh --seed --force --verbose
+              echo "DEV MODE: Running migrate:fresh --seed"
+              docker compose exec -T api-app php artisan migrate:fresh --seed --force
             else
-              echo "Running normal migrate"
-              docker compose exec -T api-app php artisan migrate --force --verbose
-              docker compose exec -T api-app php artisan db:seed --force --verbose || echo "No new seeders"
+              echo "PROD/STAGE: Running normal migrate"
+              docker compose exec -T api-app php artisan migrate --force
             fi
 
-            # Vite build on host
+            # 9. Vite Build (Executed on Host)
             echo "=== WEB: build assets START ==="
             cd web
-            rm -rf node_modules .vite public/build public/hot
+            rm -rf node_modules public/build
             npm ci --legacy-peer-deps
             npm run build
-            test -f public/build/manifest.json
             cd ..
             echo "=== WEB: build assets DONE ==="
 
-            # Laravel cache
-            echo "=== WEB: cache START ==="
+            # 10. Laravel Optimization
+            echo "=== OPTIMIZING CACHE ==="
             docker compose exec -T web-app php artisan optimize:clear
             docker compose exec -T web-app php artisan config:cache
             docker compose exec -T web-app php artisan route:cache
-            docker compose exec -T web-app php artisan view:cache
-            echo "=== WEB: cache DONE ==="
-
-            echo "=== API: cache START ==="
+            
             docker compose exec -T api-app php artisan optimize:clear
             docker compose exec -T api-app php artisan config:cache
             docker compose exec -T api-app php artisan route:cache
-            echo "=== API: cache DONE ==="
 
-            # Final checks
-            echo "=== FINAL CHECK: WEB autoload ==="
-            docker compose exec -T web-app sh -lc "cd /var/www/web && test -f vendor/autoload.php"
+            # 11. Cleanup old images
+            docker image prune -f || true
 
-            echo "=== FINAL CHECK: API autoload ==="
-            docker compose exec -T api-app sh -lc "cd /var/www/api && test -f vendor/autoload.php"
-
-            # Cleanup
-            docker image prune -f -a || true
-
-            echo ""
             echo "=================================================="
             echo "   DEPLOY COMPLETED SUCCESSFULLY!"
-            echo "   Site  → https://$DOMAIN"
-            echo "   API   → https://$DOMAIN/api"
+            echo "   Domain: https://$DOMAIN"
             echo "=================================================="
-            echo ""
           EOF
