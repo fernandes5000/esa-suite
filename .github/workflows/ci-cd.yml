@@ -43,8 +43,6 @@ jobs:
       - name: Deploy over SSH
         run: |
           ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
-            # Removemos o set -e daqui para garantir que o script sempre continue
-            # e tratamos os erros manualmente onde importa.
             set -uxo pipefail
 
             DIR_PATH="${{ env.DIR_PATH }}"
@@ -88,31 +86,31 @@ jobs:
             sudo chown -R www-data:www-data web/storage api/storage web/bootstrap/cache api/bootstrap/cache
             sudo chmod -R 775 web/storage api/storage web/bootstrap/cache api/bootstrap/cache
 
-            # 5. Docker Rebuild (Forçando ignorar o arquivo override local)
+            # 5. Docker Rebuild
             docker compose -f docker-compose.yml down --remove-orphans --timeout 30 || true
             docker compose -f docker-compose.yml up -d --build --force-recreate
 
             echo "=== WAITING FOR CONTAINERS TO BE READY ==="
             sleep 10
 
-            # 6. Composer Install - Isolado usando "run --rm"
-            # Em vez de tentar injetar comando num container rodando que pode engasgar o output,
-            # nós rodamos um container temporário focado apenas no composer, usando a mesma imagem.
+            # 6. Composer Install - Agora com </dev/null
+            # Adicionar </dev/null no final do comando impede que o container Docker ou o Composer 
+            # roubem a leitura do script bash do seu Here-Doc (EOF).
             echo "=== WEB: composer install START ==="
-            docker compose -f docker-compose.yml run --rm --no-deps -e COMPOSER_ALLOW_SUPERUSER=1 web-app composer install --working-dir=/var/www/web --optimize-autoloader --no-dev --no-interaction
+            docker compose -f docker-compose.yml run --rm --no-deps -e COMPOSER_ALLOW_SUPERUSER=1 web-app composer install --working-dir=/var/www/web --optimize-autoloader --no-dev --no-interaction </dev/null
             echo "=== WEB: composer install DONE ==="
 
             echo "=== API: composer install START ==="
-            docker compose -f docker-compose.yml run --rm --no-deps -e COMPOSER_ALLOW_SUPERUSER=1 api-app composer install --working-dir=/var/www/api --optimize-autoloader --no-dev --no-interaction
+            docker compose -f docker-compose.yml run --rm --no-deps -e COMPOSER_ALLOW_SUPERUSER=1 api-app composer install --working-dir=/var/www/api --optimize-autoloader --no-dev --no-interaction </dev/null
             echo "=== API: composer install DONE ==="
 
             # 7. Database Migrations
             if echo "$DIR_PATH" | grep -q "esa-dev"; then
               echo "DEV MODE: Running migrate:fresh --seed"
-              docker compose -f docker-compose.yml exec -T api-app php artisan migrate:fresh --seed --force || echo "Migration falhou, verifique manualmente"
+              docker compose -f docker-compose.yml exec -T api-app php artisan migrate:fresh --seed --force </dev/null || echo "Migration falhou, verifique manualmente"
             else
               echo "PROD/STAGE: Running normal migrate"
-              docker compose -f docker-compose.yml exec -T api-app php artisan migrate --force || echo "Migration falhou, verifique manualmente"
+              docker compose -f docker-compose.yml exec -T api-app php artisan migrate --force </dev/null || echo "Migration falhou, verifique manualmente"
             fi
 
             # 8. Vite Build
@@ -126,13 +124,13 @@ jobs:
 
             # 9. Laravel Optimization
             echo "=== OPTIMIZING CACHE ==="
-            docker compose -f docker-compose.yml exec -T web-app php artisan optimize:clear || true
-            docker compose -f docker-compose.yml exec -T web-app php artisan config:cache || true
-            docker compose -f docker-compose.yml exec -T web-app php artisan route:cache || true
+            docker compose -f docker-compose.yml exec -T web-app php artisan optimize:clear </dev/null || true
+            docker compose -f docker-compose.yml exec -T web-app php artisan config:cache </dev/null || true
+            docker compose -f docker-compose.yml exec -T web-app php artisan route:cache </dev/null || true
             
-            docker compose -f docker-compose.yml exec -T api-app php artisan optimize:clear || true
-            docker compose -f docker-compose.yml exec -T api-app php artisan config:cache || true
-            docker compose -f docker-compose.yml exec -T api-app php artisan route:cache || true
+            docker compose -f docker-compose.yml exec -T api-app php artisan optimize:clear </dev/null || true
+            docker compose -f docker-compose.yml exec -T api-app php artisan config:cache </dev/null || true
+            docker compose -f docker-compose.yml exec -T api-app php artisan route:cache </dev/null || true
 
             # 10. Final Checks
             echo "=== FINAL CHECK: WEB vendor ==="
