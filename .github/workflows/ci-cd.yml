@@ -43,7 +43,7 @@ jobs:
       - name: Deploy over SSH
         run: |
           ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
-            set -e
+            set -euxo pipefail
 
             DIR_PATH="${{ env.DIR_PATH }}"
             BRANCH="${{ env.BRANCH }}"
@@ -87,7 +87,59 @@ jobs:
             # Docker rebuild
             docker compose down --remove-orphans --timeout 30 || true
             docker compose up -d --build --force-recreate
-            sleep 20
+
+            echo "=== CONTAINER STATUS AFTER UP ==="
+            docker compose ps
+
+            echo "=== WAITING FOR web-app AND api-app ==="
+            for i in $(seq 1 30); do
+              WEB_CID=$(docker compose ps -q web-app || true)
+              API_CID=$(docker compose ps -q api-app || true)
+
+              WEB_STATUS="missing"
+              API_STATUS="missing"
+
+              if [ -n "${WEB_CID:-}" ]; then
+                WEB_STATUS=$(docker inspect -f '{{.State.Status}}' "$WEB_CID" 2>/dev/null || echo "missing")
+              fi
+
+              if [ -n "${API_CID:-}" ]; then
+                API_STATUS=$(docker inspect -f '{{.State.Status}}' "$API_CID" 2>/dev/null || echo "missing")
+              fi
+
+              echo "Attempt $i: web-app=$WEB_STATUS api-app=$API_STATUS"
+
+              if [ "$WEB_STATUS" = "running" ] && [ "$API_STATUS" = "running" ]; then
+                echo "Both app containers are running."
+                break
+              fi
+
+              sleep 2
+            done
+
+            WEB_CID=$(docker compose ps -q web-app || true)
+            API_CID=$(docker compose ps -q api-app || true)
+
+            WEB_STATUS="missing"
+            API_STATUS="missing"
+
+            if [ -n "${WEB_CID:-}" ]; then
+              WEB_STATUS=$(docker inspect -f '{{.State.Status}}' "$WEB_CID" 2>/dev/null || echo "missing")
+            fi
+
+            if [ -n "${API_CID:-}" ]; then
+              API_STATUS=$(docker inspect -f '{{.State.Status}}' "$API_CID" 2>/dev/null || echo "missing")
+            fi
+
+            if [ "$WEB_STATUS" != "running" ] || [ "$API_STATUS" != "running" ]; then
+              echo "One or more app containers are not running."
+              docker compose ps
+              echo "=== web-app logs ==="
+              docker compose logs web-app || true
+              echo "=== api-app logs ==="
+              docker compose logs api-app || true
+              exit 1
+            fi
 
             # Composer diagnostics
             echo "=== WEB: environment diagnostics ==="
@@ -135,7 +187,7 @@ jobs:
             # Vite build on host
             echo "Running Vite build on host..."
             cd web
-            rm -rf node_modules package-lock.json .vite public/build public/hot
+            rm -rf node_modules .vite public/build public/hot
             npm ci --legacy-peer-deps
             echo "First build attempt..."
             npm run build || echo "First build failed, forcing with --force..."
