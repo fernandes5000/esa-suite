@@ -10,7 +10,7 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
 
     steps:
       - name: Checkout code
@@ -68,7 +68,7 @@ jobs:
               DOMAIN="esa.engineer.ninja"
             fi
 
-            # .env distribution — BEFORE docker up
+            # .env distribution
             echo "$ENV_B64" | base64 -d > .env
             cp .env web/.env
             cp .env api/.env
@@ -134,53 +134,32 @@ jobs:
             if [ "$WEB_STATUS" != "running" ] || [ "$API_STATUS" != "running" ]; then
               echo "One or more app containers are not running."
               docker compose ps
-              echo "=== web-app logs ==="
               docker compose logs web-app || true
-              echo "=== api-app logs ==="
               docker compose logs api-app || true
               exit 1
             fi
 
-            # Composer diagnostics
-            echo "=== WEB: environment diagnostics ==="
-            docker compose exec -T web-app sh -lc "whoami && pwd && php -v && composer --version && cd /var/www/web && pwd && ls -la"
-
-            echo "=== API: environment diagnostics ==="
-            docker compose exec -T api-app sh -lc "whoami && pwd && php -v && composer --version && cd /var/www/api && pwd && ls -la"
-
+            # Composer install
             echo "=== WEB: composer install ==="
-            docker compose exec -T web-app sh -lc "cd /var/www/web && COMPOSER_ALLOW_SUPERUSER=1 composer install --optimize-autoloader --no-dev --no-interaction -vvv" || \
-              (echo "WEB COMPOSER FAILED" && \
-               docker compose exec -T web-app sh -lc 'cd /var/www/web && pwd && ls -la && composer diagnose || true' && \
-               docker compose logs web-app && exit 1)
+            docker compose exec -T web-app sh -lc "cd /var/www/web && COMPOSER_ALLOW_SUPERUSER=1 composer install --optimize-autoloader --no-dev --no-interaction"
 
             echo "=== API: composer install ==="
-            docker compose exec -T api-app sh -lc "cd /var/www/api && COMPOSER_ALLOW_SUPERUSER=1 composer install --optimize-autoloader --no-dev --no-interaction -vvv" || \
-              (echo "API COMPOSER FAILED" && \
-               docker compose exec -T api-app sh -lc 'cd /var/www/api && pwd && ls -la && composer diagnose || true' && \
-               docker compose logs api-app && exit 1)
+            docker compose exec -T api-app sh -lc "cd /var/www/api && COMPOSER_ALLOW_SUPERUSER=1 composer install --optimize-autoloader --no-dev --no-interaction"
 
+            # Validate vendor
             echo "=== WEB: validate vendor ==="
-            docker compose exec -T web-app sh -lc "cd /var/www/web && test -f vendor/autoload.php && ls -la vendor | head -20" || \
-              (echo "WEB VENDOR MISSING" && \
-               docker compose exec -T web-app sh -lc 'cd /var/www/web && pwd && ls -la' && \
-               docker compose logs web-app && exit 1)
+            docker compose exec -T web-app sh -lc "cd /var/www/web && test -f vendor/autoload.php"
 
             echo "=== API: validate vendor ==="
-            docker compose exec -T api-app sh -lc "cd /var/www/api && test -f vendor/autoload.php && ls -la vendor | head -20" || \
-              (echo "API VENDOR MISSING" && \
-               docker compose exec -T api-app sh -lc 'cd /var/www/api && pwd && ls -la' && \
-               docker compose logs api-app && exit 1)
+            docker compose exec -T api-app sh -lc "cd /var/www/api && test -f vendor/autoload.php"
 
             # Database
             if echo "$DIR_PATH" | grep -q "esa-dev"; then
               echo "DEV: Running migrate:fresh --seed"
-              docker compose exec -T api-app php artisan migrate:fresh --seed --force --verbose || \
-                (echo "MIGRATE:FRESH FAILED" && docker compose logs api-app && exit 1)
+              docker compose exec -T api-app php artisan migrate:fresh --seed --force --verbose
             else
               echo "Running normal migrate"
-              docker compose exec -T api-app php artisan migrate --force --verbose || \
-                (echo "MIGRATE FAILED" && docker compose logs api-app && exit 1)
+              docker compose exec -T api-app php artisan migrate --force --verbose
               docker compose exec -T api-app php artisan db:seed --force --verbose || echo "No new seeders"
             fi
 
@@ -189,21 +168,8 @@ jobs:
             cd web
             rm -rf node_modules .vite public/build public/hot
             npm ci --legacy-peer-deps
-            echo "First build attempt..."
-            npm run build || echo "First build failed, forcing with --force..."
-            if [ ! -f "public/build/manifest.json" ]; then
-              echo "manifest.json not generated. Forcing rebuild..."
-              rm -rf node_modules .vite public/build
-              npm ci --legacy-peer-deps
-              npm run build -- --force
-            fi
-            if [ -f "public/build/manifest.json" ]; then
-              echo "VITE BUILD SUCCESSFUL! manifest.json generated"
-            else
-              echo "FATAL: manifest.json still not generated!"
-              ls -la public/build/ || true
-              exit 1
-            fi
+            npm run build
+            test -f public/build/manifest.json
             cd ..
 
             # Laravel cache
@@ -216,22 +182,14 @@ jobs:
             docker compose exec -T api-app php artisan config:cache
             docker compose exec -T api-app php artisan route:cache
 
-            # Final checks
-            echo "=== FINAL CHECK: WEB autoload ==="
-            docker compose exec -T web-app sh -lc "cd /var/www/web && test -f vendor/autoload.php"
-
-            echo "=== FINAL CHECK: API autoload ==="
-            docker compose exec -T api-app sh -lc "cd /var/www/api && test -f vendor/autoload.php"
-
             # Cleanup
             docker image prune -f -a || true
 
             echo ""
             echo "=================================================="
-            echo "   DEPLOY 100% COMPLETED SUCCESSFULLY!"
+            echo "   DEPLOY COMPLETED SUCCESSFULLY!"
             echo "   Site  → https://$DOMAIN"
             echo "   API   → https://$DOMAIN/api"
-            echo "   Adminer → https://$(hostname -I | awk '{print $1}'):8082"
             echo "=================================================="
             echo ""
           EOF
