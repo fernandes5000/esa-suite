@@ -89,23 +89,33 @@ jobs:
             docker compose up -d --build --force-recreate
             sleep 20
 
-            # Composer install — SEM -T
-            docker compose exec web-app composer install --optimize-autoloader --no-dev --no-interaction || \
+            # Composer install
+            docker compose exec -T web-app composer --version
+            docker compose exec -T api-app composer --version
+
+            docker compose exec -T web-app composer install --optimize-autoloader --no-dev --no-interaction || \
               (echo "WEB COMPOSER FAILED" && docker compose logs web-app && exit 1)
 
-            docker compose exec api-app composer install --optimize-autoloader --no-dev --no-interaction || \
+            docker compose exec -T api-app composer install --optimize-autoloader --no-dev --no-interaction || \
               (echo "API COMPOSER FAILED" && docker compose logs api-app && exit 1)
+
+            # Validate vendor
+            docker compose exec -T web-app sh -lc "test -f /var/www/web/vendor/autoload.php" || \
+              (echo "WEB VENDOR MISSING" && docker compose exec -T web-app sh -lc 'ls -la /var/www/web' && docker compose logs web-app && exit 1)
+
+            docker compose exec -T api-app sh -lc "test -f /var/www/api/vendor/autoload.php" || \
+              (echo "API VENDOR MISSING" && docker compose exec -T api-app sh -lc 'ls -la /var/www/api' && docker compose logs api-app && exit 1)
 
             # Database
             if echo "$DIR_PATH" | grep -q "esa-dev"; then
               echo "DEV: Running migrate:fresh --seed"
-              docker compose exec api-app php artisan migrate:fresh --seed --force --verbose || \
+              docker compose exec -T api-app php artisan migrate:fresh --seed --force --verbose || \
                 (echo "MIGRATE:FRESH FAILED" && docker compose logs api-app && exit 1)
             else
               echo "Running normal migrate"
-              docker compose exec api-app php artisan migrate --force --verbose || \
+              docker compose exec -T api-app php artisan migrate --force --verbose || \
                 (echo "MIGRATE FAILED" && docker compose logs api-app && exit 1)
-              docker compose exec api-app php artisan db:seed --force --verbose || echo "No new seeders"
+              docker compose exec -T api-app php artisan db:seed --force --verbose || echo "No new seeders"
             fi
 
             # Vite build on host
@@ -135,7 +145,10 @@ jobs:
             docker compose exec -T web-app php artisan config:cache
             docker compose exec -T web-app php artisan route:cache
             docker compose exec -T web-app php artisan view:cache
-            docker compose exec -T api-app php artisan optimize
+
+            docker compose exec -T api-app php artisan optimize:clear
+            docker compose exec -T api-app php artisan config:cache
+            docker compose exec -T api-app php artisan route:cache
 
             # Cleanup
             docker image prune -f -a || true
