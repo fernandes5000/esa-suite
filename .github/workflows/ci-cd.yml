@@ -89,22 +89,36 @@ jobs:
             docker compose up -d --build --force-recreate
             sleep 20
 
-            # Composer install
-            docker compose exec -T web-app composer --version
-            docker compose exec -T api-app composer --version
+            # Composer diagnostics
+            echo "=== WEB: environment diagnostics ==="
+            docker compose exec -T web-app sh -lc "whoami && pwd && php -v && composer --version && cd /var/www/web && pwd && ls -la"
 
-            docker compose exec -T web-app composer install --optimize-autoloader --no-dev --no-interaction || \
-              (echo "WEB COMPOSER FAILED" && docker compose logs web-app && exit 1)
+            echo "=== API: environment diagnostics ==="
+            docker compose exec -T api-app sh -lc "whoami && pwd && php -v && composer --version && cd /var/www/api && pwd && ls -la"
 
-            docker compose exec -T api-app composer install --optimize-autoloader --no-dev --no-interaction || \
-              (echo "API COMPOSER FAILED" && docker compose logs api-app && exit 1)
+            echo "=== WEB: composer install ==="
+            docker compose exec -T web-app sh -lc "cd /var/www/web && COMPOSER_ALLOW_SUPERUSER=1 composer install --optimize-autoloader --no-dev --no-interaction -vvv" || \
+              (echo "WEB COMPOSER FAILED" && \
+               docker compose exec -T web-app sh -lc 'cd /var/www/web && pwd && ls -la && composer diagnose || true' && \
+               docker compose logs web-app && exit 1)
 
-            # Validate vendor
-            docker compose exec -T web-app sh -lc "test -f /var/www/web/vendor/autoload.php" || \
-              (echo "WEB VENDOR MISSING" && docker compose exec -T web-app sh -lc 'ls -la /var/www/web' && docker compose logs web-app && exit 1)
+            echo "=== API: composer install ==="
+            docker compose exec -T api-app sh -lc "cd /var/www/api && COMPOSER_ALLOW_SUPERUSER=1 composer install --optimize-autoloader --no-dev --no-interaction -vvv" || \
+              (echo "API COMPOSER FAILED" && \
+               docker compose exec -T api-app sh -lc 'cd /var/www/api && pwd && ls -la && composer diagnose || true' && \
+               docker compose logs api-app && exit 1)
 
-            docker compose exec -T api-app sh -lc "test -f /var/www/api/vendor/autoload.php" || \
-              (echo "API VENDOR MISSING" && docker compose exec -T api-app sh -lc 'ls -la /var/www/api' && docker compose logs api-app && exit 1)
+            echo "=== WEB: validate vendor ==="
+            docker compose exec -T web-app sh -lc "cd /var/www/web && test -f vendor/autoload.php && ls -la vendor | head -20" || \
+              (echo "WEB VENDOR MISSING" && \
+               docker compose exec -T web-app sh -lc 'cd /var/www/web && pwd && ls -la' && \
+               docker compose logs web-app && exit 1)
+
+            echo "=== API: validate vendor ==="
+            docker compose exec -T api-app sh -lc "cd /var/www/api && test -f vendor/autoload.php && ls -la vendor | head -20" || \
+              (echo "API VENDOR MISSING" && \
+               docker compose exec -T api-app sh -lc 'cd /var/www/api && pwd && ls -la' && \
+               docker compose logs api-app && exit 1)
 
             # Database
             if echo "$DIR_PATH" | grep -q "esa-dev"; then
@@ -149,6 +163,13 @@ jobs:
             docker compose exec -T api-app php artisan optimize:clear
             docker compose exec -T api-app php artisan config:cache
             docker compose exec -T api-app php artisan route:cache
+
+            # Final checks
+            echo "=== FINAL CHECK: WEB autoload ==="
+            docker compose exec -T web-app sh -lc "cd /var/www/web && test -f vendor/autoload.php"
+
+            echo "=== FINAL CHECK: API autoload ==="
+            docker compose exec -T api-app sh -lc "cd /var/www/api && test -f vendor/autoload.php"
 
             # Cleanup
             docker image prune -f -a || true
