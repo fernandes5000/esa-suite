@@ -50,14 +50,22 @@ jobs:
             ENV_B64="${{ env.ENV_B64 }}"
 
             echo "Deploying to $DIR_PATH (branch: $BRANCH)"
-            cd "$DIR_PATH"
 
-            # 1. Git Cleanup
-            sudo git clean -fdx
-            sudo git reset --hard
-            git fetch --all --prune --quiet
-            git checkout "$BRANCH" --force
-            git reset --hard "origin/$BRANCH"
+            # 1. Git Setup / Clone or Update
+            if [ ! -d "$DIR_PATH/.git" ]; then
+              echo "Directory does not exist or is not a git repository. Cloning..."
+              mkdir -p "$DIR_PATH"
+              git clone -b "$BRANCH" git@github.com:fernandes5000/esa-suite.git "$DIR_PATH"
+              cd "$DIR_PATH"
+            else
+              echo "Directory exists. Fetching updates..."
+              cd "$DIR_PATH"
+              sudo git clean -fdx
+              sudo git reset --hard
+              git fetch --all --prune --quiet
+              git checkout "$BRANCH" --force
+              git reset --hard "origin/$BRANCH"
+            fi
 
             # 2. Dynamic Domain
             if echo "$DIR_PATH" | grep -q "esa-dev"; then
@@ -86,16 +94,14 @@ jobs:
             sudo chown -R www-data:www-data web/storage api/storage web/bootstrap/cache api/bootstrap/cache
             sudo chmod -R 775 web/storage api/storage web/bootstrap/cache api/bootstrap/cache
 
-            # 5. Docker Rebuild
+            # 5. Docker Rebuild (Force ignoring local override)
             docker compose -f docker-compose.yml down --remove-orphans --timeout 30 || true
             docker compose -f docker-compose.yml up -d --build --force-recreate
 
             echo "=== WAITING FOR CONTAINERS TO BE READY ==="
             sleep 10
 
-            # 6. Composer Install - Agora com </dev/null
-            # Adicionar </dev/null no final do comando impede que o container Docker ou o Composer 
-            # roubem a leitura do script bash do seu Here-Doc (EOF).
+            # 6. Composer Install - Isolated via run --rm with </dev/null to prevent hanging
             echo "=== WEB: composer install START ==="
             docker compose -f docker-compose.yml run --rm --no-deps -e COMPOSER_ALLOW_SUPERUSER=1 web-app composer install --working-dir=/var/www/web --optimize-autoloader --no-dev --no-interaction </dev/null
             echo "=== WEB: composer install DONE ==="
@@ -107,10 +113,10 @@ jobs:
             # 7. Database Migrations
             if echo "$DIR_PATH" | grep -q "esa-dev"; then
               echo "DEV MODE: Running migrate:fresh --seed"
-              docker compose -f docker-compose.yml exec -T api-app php artisan migrate:fresh --seed --force </dev/null || echo "Migration falhou, verifique manualmente"
+              docker compose -f docker-compose.yml exec -T api-app php artisan migrate:fresh --seed --force </dev/null || echo "Migration failed, please check manually"
             else
               echo "PROD/STAGE: Running normal migrate"
-              docker compose -f docker-compose.yml exec -T api-app php artisan migrate --force </dev/null || echo "Migration falhou, verifique manualmente"
+              docker compose -f docker-compose.yml exec -T api-app php artisan migrate --force </dev/null || echo "Migration failed, please check manually"
             fi
 
             # 8. Vite Build
@@ -134,10 +140,10 @@ jobs:
 
             # 10. Final Checks
             echo "=== FINAL CHECK: WEB vendor ==="
-            test -f web/vendor/autoload.php && echo "WEB OK" || echo "WEB FALHOU"
+            test -f web/vendor/autoload.php && echo "WEB OK" || echo "WEB FAILED"
             
             echo "=== FINAL CHECK: API vendor ==="
-            test -f api/vendor/autoload.php && echo "API OK" || echo "API FALHOU"
+            test -f api/vendor/autoload.php && echo "API OK" || echo "API FAILED"
 
             # 11. Cleanup
             docker image prune -f || true
