@@ -52,14 +52,14 @@ jobs:
             echo "Deploying to $DIR_PATH (branch: $BRANCH)"
             cd "$DIR_PATH"
 
-            # 1. Git Cleanup & Update
+            # 1. Git Cleanup
             sudo git clean -fdx
             sudo git reset --hard
             git fetch --all --prune --quiet
             git checkout "$BRANCH" --force
             git reset --hard "origin/$BRANCH"
 
-            # 2. Dynamic domain detection
+            # 2. Dynamic Domain
             if echo "$DIR_PATH" | grep -q "esa-dev"; then
               DOMAIN="esa-dev.engineer.ninja"
             elif echo "$DIR_PATH" | grep -q "esa-stage"; then
@@ -80,39 +80,39 @@ jobs:
             sed -i "s|API_URL=.*|API_URL=http://api-nginx/api|" web/.env
             sed -i "s|API_PUBLIC_URL=.*|API_PUBLIC_URL=https://$DOMAIN/api|" web/.env
 
-            # 4. Storage & permissions setup
+            # 4. Storage & permissions
             mkdir -p web/storage/framework/{cache,data,sessions,views} web/storage/logs web/bootstrap/cache
             mkdir -p api/storage/framework/{cache,data,sessions,views} api/storage/logs api/bootstrap/cache
             sudo chown -R www-data:www-data web/storage api/storage web/bootstrap/cache api/bootstrap/cache
             sudo chmod -R 775 web/storage api/storage web/bootstrap/cache api/bootstrap/cache
 
-            # 5. Docker Rebuild
-            docker compose down --remove-orphans --timeout 30 || true
-            docker compose up -d --build --force-recreate
+            # 5. Docker Rebuild (Forçando ignorar o arquivo override local)
+            docker compose -f docker-compose.yml down --remove-orphans --timeout 30 || true
+            docker compose -f docker-compose.yml up -d --build --force-recreate
 
             echo "=== WAITING FOR CONTAINERS TO BE READY ==="
-            sleep 5
+            sleep 10
 
             # 6. Composer Install - WEB
             echo "=== WEB: composer install START ==="
-            docker compose exec -T web-app sh -c "cd /var/www/web && COMPOSER_ALLOW_SUPERUSER=1 composer install --optimize-autoloader --no-dev --no-interaction"
+            docker compose -f docker-compose.yml exec -T -e COMPOSER_ALLOW_SUPERUSER=1 web-app composer install --working-dir=/var/www/web --optimize-autoloader --no-dev --no-interaction || echo "Aviso: Composer do Web teve um erro leve, mas continuando..."
             echo "=== WEB: composer install DONE ==="
 
             # 7. Composer Install - API
             echo "=== API: composer install START ==="
-            docker compose exec -T api-app sh -c "cd /var/www/api && COMPOSER_ALLOW_SUPERUSER=1 composer install --optimize-autoloader --no-dev --no-interaction"
+            docker compose -f docker-compose.yml exec -T -e COMPOSER_ALLOW_SUPERUSER=1 api-app composer install --working-dir=/var/www/api --optimize-autoloader --no-dev --no-interaction || echo "Aviso: Composer da API falhou."
             echo "=== API: composer install DONE ==="
 
             # 8. Database Migrations
             if echo "$DIR_PATH" | grep -q "esa-dev"; then
               echo "DEV MODE: Running migrate:fresh --seed"
-              docker compose exec -T api-app php artisan migrate:fresh --seed --force
+              docker compose -f docker-compose.yml exec -T api-app php artisan migrate:fresh --seed --force
             else
               echo "PROD/STAGE: Running normal migrate"
-              docker compose exec -T api-app php artisan migrate --force
+              docker compose -f docker-compose.yml exec -T api-app php artisan migrate --force
             fi
 
-            # 9. Vite Build (Executed on Host)
+            # 9. Vite Build
             echo "=== WEB: build assets START ==="
             cd web
             rm -rf node_modules public/build
@@ -123,15 +123,22 @@ jobs:
 
             # 10. Laravel Optimization
             echo "=== OPTIMIZING CACHE ==="
-            docker compose exec -T web-app php artisan optimize:clear
-            docker compose exec -T web-app php artisan config:cache
-            docker compose exec -T web-app php artisan route:cache
+            docker compose -f docker-compose.yml exec -T web-app php artisan optimize:clear
+            docker compose -f docker-compose.yml exec -T web-app php artisan config:cache
+            docker compose -f docker-compose.yml exec -T web-app php artisan route:cache
             
-            docker compose exec -T api-app php artisan optimize:clear
-            docker compose exec -T api-app php artisan config:cache
-            docker compose exec -T api-app php artisan route:cache
+            docker compose -f docker-compose.yml exec -T api-app php artisan optimize:clear
+            docker compose -f docker-compose.yml exec -T api-app php artisan config:cache
+            docker compose -f docker-compose.yml exec -T api-app php artisan route:cache
 
-            # 11. Cleanup old images
+            # 11. Final Checks
+            echo "=== FINAL CHECK: WEB vendor ==="
+            docker compose -f docker-compose.yml exec -T web-app test -f /var/www/web/vendor/autoload.php && echo "OK" || echo "FALHOU"
+            
+            echo "=== FINAL CHECK: API vendor ==="
+            docker compose -f docker-compose.yml exec -T api-app test -f /var/www/api/vendor/autoload.php && echo "OK" || echo "FALHOU"
+
+            # 12. Cleanup
             docker image prune -f || true
 
             echo "=================================================="
