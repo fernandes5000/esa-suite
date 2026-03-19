@@ -42,6 +42,8 @@ class RegisterController extends Controller
             'auth_id'   => $response['data']['user_id']
         ]);
 
+        session()->save();
+
         return redirect()->route('dashboard');
     }
 }
