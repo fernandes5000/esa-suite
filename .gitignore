@@ -44,3 +44,7 @@ web/vendor/
 
 # Misc
 *.cache
+
+dev.env
+stage.env
+prod.env
