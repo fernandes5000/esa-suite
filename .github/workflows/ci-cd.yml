@@ -48,8 +48,10 @@ jobs:
             DIR_PATH="${{ env.DIR_PATH }}"
             BRANCH="${{ env.BRANCH }}"
             ENV_B64="${{ env.ENV_B64 }}"
+            
+            export COMPOSE_PROJECT_NAME="esa_${BRANCH}"
 
-            echo "Deploying to $DIR_PATH (branch: $BRANCH)"
+            echo "Deploying to $DIR_PATH (branch: $BRANCH) with Project Name: $COMPOSE_PROJECT_NAME"
 
             # 1. Git Setup / Clone or Update
             if [ ! -d "$DIR_PATH/.git" ]; then
@@ -94,14 +96,14 @@ jobs:
             sudo chown -R www-data:www-data web/storage api/storage web/bootstrap/cache api/bootstrap/cache
             sudo chmod -R 775 web/storage api/storage web/bootstrap/cache api/bootstrap/cache
 
-            # 5. Docker Rebuild (Force ignoring local override)
+            # 5. Docker Rebuild
             docker compose -f docker-compose.yml down --remove-orphans --timeout 30 || true
             docker compose -f docker-compose.yml up -d --build --force-recreate
 
             echo "=== WAITING FOR CONTAINERS TO BE READY ==="
             sleep 10
 
-            # 6. Composer Install - Isolated via run --rm with </dev/null to prevent hanging
+            # 6. Composer Install
             echo "=== WEB: composer install START ==="
             docker compose -f docker-compose.yml run --rm --no-deps -e COMPOSER_ALLOW_SUPERUSER=1 web-app composer install --working-dir=/var/www/web --optimize-autoloader --no-dev --no-interaction </dev/null
             echo "=== WEB: composer install DONE ==="
@@ -113,10 +115,10 @@ jobs:
             # 7. Database Migrations
             if echo "$DIR_PATH" | grep -q "esa-dev"; then
               echo "DEV MODE: Running migrate:fresh --seed"
-              docker compose -f docker-compose.yml exec -T api-app php artisan migrate:fresh --seed --force </dev/null || echo "Migration failed, please check manually"
+              docker compose -f docker-compose.yml exec -T api-app php artisan migrate:fresh --seed --force </dev/null || echo "Migration failed"
             else
               echo "PROD/STAGE: Running normal migrate"
-              docker compose -f docker-compose.yml exec -T api-app php artisan migrate --force </dev/null || echo "Migration failed, please check manually"
+              docker compose -f docker-compose.yml exec -T api-app php artisan migrate --force </dev/null || echo "Migration failed"
             fi
 
             # 8. Vite Build
