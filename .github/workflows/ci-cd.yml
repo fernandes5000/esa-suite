@@ -91,11 +91,11 @@ jobs:
             sed -i "s|API_PUBLIC_URL=.*|API_PUBLIC_URL=https://$DOMAIN/api|" web/.env
 
             # 4. Storage & permissions
-            # www-data in Alpine PHP-FPM image is UID 82 / GID 82 (differs from Ubuntu's UID 33)
+            # www-data in php:8.4-fpm (Debian) is UID 33 / GID 33
             mkdir -p web/storage/framework/{cache,data,sessions,views} web/storage/logs web/bootstrap/cache
             mkdir -p api/storage/framework/{cache,data,sessions,views} api/storage/logs api/bootstrap/cache
-            sudo chown -R 82:82 web/storage web/bootstrap/cache
-            sudo chown -R 82:82 api/storage api/bootstrap/cache
+            sudo chown -R 33:33 web/storage web/bootstrap/cache
+            sudo chown -R 33:33 api/storage api/bootstrap/cache
             sudo chmod -R 775 web/storage web/bootstrap/cache
             sudo chmod -R 775 api/storage api/bootstrap/cache
 
