@@ -7,6 +7,7 @@ services:
       args:
         - APP_ENV=${APP_ENV:-production}
     container_name: ${PROJECT_NAME}_web_app
+    user: "1000:1000"
     restart: unless-stopped
     working_dir: /var/www/web
     volumes:
@@ -47,6 +48,7 @@ services:
       args:
         - APP_ENV=${APP_ENV:-production}
     container_name: ${PROJECT_NAME}_api_app
+    user: "1000:1000"
     restart: unless-stopped
     working_dir: /var/www/api
     volumes:

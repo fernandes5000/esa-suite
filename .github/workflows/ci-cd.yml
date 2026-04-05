@@ -101,12 +101,6 @@ jobs:
             echo "=== WAITING FOR CONTAINERS TO BE READY ==="
             sleep 10
 
-            # Fix permissions inside containers (www-data UID is 82 in Alpine, 33 on Ubuntu host)
-            docker compose -f docker-compose.yml exec -T web-app chown -R www-data:www-data /var/www/web/storage /var/www/web/bootstrap/cache
-            docker compose -f docker-compose.yml exec -T web-app chmod -R 775 /var/www/web/storage /var/www/web/bootstrap/cache
-            docker compose -f docker-compose.yml exec -T api-app chown -R www-data:www-data /var/www/api/storage /var/www/api/bootstrap/cache
-            docker compose -f docker-compose.yml exec -T api-app chmod -R 775 /var/www/api/storage /var/www/api/bootstrap/cache
-
             # 6. Composer Install
             echo "=== WEB: composer install START ==="
             docker compose -f docker-compose.yml run --rm --no-deps -e COMPOSER_ALLOW_SUPERUSER=1 web-app composer install --working-dir=/var/www/web --optimize-autoloader --no-dev --no-interaction </dev/null
