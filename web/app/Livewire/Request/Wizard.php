@@ -17,9 +17,7 @@ class Wizard extends Component
     public string $description = '';
     public bool $terms_accepted = false;
 
-    public array $challengeOptions = [
-        'Anxiety', 'Depression', 'Stress', 'Panic Attacks', 'Social Phobia', 'Other'
-    ];
+    public array $challengeOptions = [];
 
     public bool $showingAddPetModal = false;
     public string $pet_name = '';
@@ -40,17 +38,22 @@ class Wizard extends Component
     public ?int $deletingPetId = null;
     public string $deletingPetName = '';
 
-    public function mount(array $requestData)
+    public function mount(array $requestData, ApiClient $client)
     {
+        $this->challengeOptions = config('esa.challenge_options');
         $this->requestData = $requestData;
         $this->step = $this->requestData['wizard_step'] ?? 1;
 
-        $this->certificate_name = $this->requestData['certificate_name'] 
+        $this->certificate_name = $this->requestData['certificate_name']
                                 ?? session('user_name', '');
         $this->problem_checkboxes = $this->requestData['problem_checkboxes'] ?? [];
         $this->description = $this->requestData['description'] ?? '';
-        
+
         $this->terms_accepted = false;
+
+        if ($this->step == 3) {
+            $this->loadUserPets($client);
+        }
     }
 
     public function loadUserPets(ApiClient $client)
@@ -151,10 +154,14 @@ class Wizard extends Component
 
         if ($this->step > 1) {
             $this->step--;
-            
+
             $client->put("/v1/esa-request/{$this->requestData['id']}", [
                 'wizard_step' => $this->step
             ]);
+
+            if ($this->step == 3) {
+                $this->loadUserPets($client);
+            }
         }
     }
 
@@ -198,7 +205,7 @@ class Wizard extends Component
             session()->flash('error', $res['error'] ?? 'It was not possible to save the pet.');
             return;
         }
-        $this->loadUserPets($client);
+        $this->userPets[] = $res['data'];
         $this->closeAddPetModal();
     }
 
@@ -228,7 +235,7 @@ class Wizard extends Component
     public function updatePet()
     {
         $client = app(ApiClient::class);
-        $this->pet_name = $this->edit_pet_name;
+        $this->pet_name  = $this->edit_pet_name;
         $this->pet_type = $this->edit_pet_type;
         $this->pet_breed = $this->edit_pet_breed;
         $this->pet_age = $this->edit_pet_age;
@@ -245,12 +252,15 @@ class Wizard extends Component
         ]);
 
         if (!($res['ok'] ?? false)) {
-            session()->flash('error', $res['error'] ?? 'It was not possible to update the pet..');
+            session()->flash('error', $res['error'] ?? 'It was not possible to update the pet.');
             return;
         }
-        
+
+        $this->userPets = array_map(function ($pet) use ($res) {
+            return $pet['id'] === $res['data']['id'] ? $res['data'] : $pet;
+        }, $this->userPets);
+
         session()->flash('success', __('Pet updated successfully!'));
-        $this->loadUserPets($client);
         $this->closeEditPetModal();
     }
 
@@ -264,25 +274,21 @@ class Wizard extends Component
     
     public function deletePet()
     {
-        $client = app(ApiClient::class);
-        $res = $client->delete("/v1/pets/{$this->deletingPetId}");
+        $res = app(ApiClient::class)->delete("/v1/pets/{$this->deletingPetId}");
 
         if (!($res['ok'] ?? false)) {
             session()->flash('error', $res['error'] ?? 'It was not possible to delete the pet..');
             return;
         }
         
+        $this->userPets = array_values(array_filter($this->userPets, fn($p) => $p['id'] !== $this->deletingPetId));
+
         session()->flash('success', __('Pet deleted successfully!'));
-        $this->loadUserPets($client);
         $this->closeDeletePetModal();
     }
     
-    public function render(ApiClient $client)
+    public function render()
     {
-        if ($this->step == 3) {
-            $this->loadUserPets($client);
-        }
-        
         return view('livewire.request.wizard');
     }
 }

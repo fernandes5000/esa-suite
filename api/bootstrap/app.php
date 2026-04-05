@@ -5,6 +5,7 @@ use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Spatie\Permission\Middleware\PermissionMiddleware;
 use App\Http\Middleware\ForceTokenFromQuery;
+use App\Http\Middleware\EnsureUserIsNotBanned;
 use Illuminate\Http\Request;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -18,10 +19,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'permission' => PermissionMiddleware::class,
             'token.query' => ForceTokenFromQuery::class,
-        ]);
-
-        $middleware->api(prepend: [
-            ForceTokenFromQuery::class,
+            'not.banned' => EnsureUserIsNotBanned::class,
         ]);
 
         $middleware->trustProxies(at: '*');

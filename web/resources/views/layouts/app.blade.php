@@ -185,6 +185,5 @@
     </div>
     
     @livewireScripts
-    <script src="{{ asset('js/alpine.js') }}?v={{ filemtime(public_path('js/alpine.js')) }}" defer></script>
 </body>
 </html>

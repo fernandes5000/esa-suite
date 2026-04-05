@@ -20,7 +20,11 @@ class RequestQueue extends Component
     public function loadRequests(ApiClient $client)
     {
         $res = $client->get('/v1/therapist/requests');
-        $this->requests = $res['ok'] ? $res['data'] : [];
+        if ($res['ok'] ?? false) {
+            $this->requests = $res['data']['data'] ?? $res['data'] ?? [];
+        } else {
+            $this->requests = [];
+        }
     }
 
     public function openReviewModal($request)

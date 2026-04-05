@@ -13,14 +13,14 @@ class RequestController extends Controller
 {
     use ApiResponseTrait;
 
-    public function index()
+    public function index(Request $request)
     {
         $requests = EsaRequest::where('status', 'pending')
             ->with(['user', 'pets'])
             ->orderBy('created_at', 'desc')
-            ->get();
+            ->paginate($request->integer('per_page', 25));
 
-        return $this->apiSuccess(EsaRequestResource::collection($requests));
+        return $this->apiSuccess(EsaRequestResource::collection($requests)->response()->getData(true));
     }
 
     public function approve($id)

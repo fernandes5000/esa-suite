@@ -48,7 +48,7 @@
             <p class="text-gray-600 mb-6">{{ __("The pets listed here will be included in your request.") }}</p>
             <div class="space-y-4">
                 @forelse($userPets as $pet)
-                    <div class="flex items-center justify-between p-4 border border-gray-200 rounded-md">
+                    <div wire:key="pet-{{ $pet['id'] }}" class="flex items-center justify-between p-4 border border-gray-200 rounded-md">
                         <div class="ml-3 text-sm">
                             <span class="font-medium text-gray-900">{{ $pet['name'] }}</span>
                             <p class="text-gray-500">{{ $pet['type'] }} - {{ $pet['breed'] ?? 'N/A' }}</p>

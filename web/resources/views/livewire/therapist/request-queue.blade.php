@@ -26,7 +26,7 @@
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
                 @forelse($requests as $req)
-                    <tr class="hover:bg-gray-50 transition">
+                    <tr wire:key="req-{{ $req['id'] }}" class="hover:bg-gray-50 transition">
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             #{{ $req['id'] }}
                         </td>

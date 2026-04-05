@@ -22,10 +22,11 @@ Route::prefix('v1')->group(function () {
      
      Route::post('/auth/login', [AuthController::class, 'login']);
 
-     Route::get('/esa-request/{esaRequest}/download', [RequestController::class, 'downloadPdf']);
-     
      // --- Protected Routes (Require Sanctum token) ---
-     Route::middleware('auth:sanctum')->group(function () {
+     Route::middleware(['auth:sanctum', 'not.banned'])->group(function () {
+
+          Route::get('/esa-request/{esaRequest}/download', [RequestController::class, 'downloadPdf'])
+               ->middleware('token.query');
 
           // --- Therapist Routes ---
           Route::prefix('therapist')
