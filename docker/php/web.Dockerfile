@@ -26,6 +26,12 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 WORKDIR /var/www/web
 
-RUN chown -R www-data:www-data /var/www/web
+RUN mkdir -p storage/framework/views \
+             storage/framework/cache/data \
+             storage/framework/sessions \
+             storage/logs \
+             bootstrap/cache \
+    && chown -R www-data:www-data /var/www/web \
+    && chmod -R 775 storage bootstrap/cache
 
 CMD ["php-fpm"]
