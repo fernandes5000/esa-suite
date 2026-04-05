@@ -90,11 +90,9 @@ jobs:
             sed -i "s|API_URL=.*|API_URL=http://api-nginx/api|" web/.env
             sed -i "s|API_PUBLIC_URL=.*|API_PUBLIC_URL=https://$DOMAIN/api|" web/.env
 
-            # 4. Storage & permissions
+            # 4. Storage & permissions (host-side: ensure directories exist only)
             mkdir -p web/storage/framework/{cache,data,sessions,views} web/storage/logs web/bootstrap/cache
             mkdir -p api/storage/framework/{cache,data,sessions,views} api/storage/logs api/bootstrap/cache
-            sudo chown -R www-data:www-data web/storage api/storage web/bootstrap/cache api/bootstrap/cache
-            sudo chmod -R 775 web/storage api/storage web/bootstrap/cache api/bootstrap/cache
 
             # 5. Docker Rebuild
             docker compose -f docker-compose.yml down --remove-orphans --timeout 30 || true
@@ -102,6 +100,12 @@ jobs:
 
             echo "=== WAITING FOR CONTAINERS TO BE READY ==="
             sleep 10
+
+            # Fix permissions inside containers (www-data UID is 82 in Alpine, 33 on Ubuntu host)
+            docker compose -f docker-compose.yml exec -T web-app chown -R www-data:www-data /var/www/web/storage /var/www/web/bootstrap/cache
+            docker compose -f docker-compose.yml exec -T web-app chmod -R 775 /var/www/web/storage /var/www/web/bootstrap/cache
+            docker compose -f docker-compose.yml exec -T api-app chown -R www-data:www-data /var/www/api/storage /var/www/api/bootstrap/cache
+            docker compose -f docker-compose.yml exec -T api-app chmod -R 775 /var/www/api/storage /var/www/api/bootstrap/cache
 
             # 6. Composer Install
             echo "=== WEB: composer install START ==="
