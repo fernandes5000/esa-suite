@@ -4,13 +4,16 @@ RUN apk add --no-cache \
     git \
     curl \
     libpng-dev \
+    libjpeg-turbo-dev \
+    freetype-dev \
     oniguruma-dev \
     libxml2-dev \
     libzip-dev \
     zip \
     unzip
 
-RUN docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip
+RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip
 
 RUN apk add --no-cache $PHPIZE_DEPS \
     && pecl install redis \
