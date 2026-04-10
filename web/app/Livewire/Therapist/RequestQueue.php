@@ -50,13 +50,13 @@ class RequestQueue extends Component
         $res = $client->authedPost("/v1/therapist/requests/{$id}/approve");
         
         if ($res['ok']) {
-            session()->flash('success', 'Request Approved Successfully!');
+            session()->flash('success', __('Request Approved Successfully!'));
             $this->closeReviewModal();
-            
-            $this->loadRequests($client); 
-            
+
+            $this->loadRequests($client);
+
         } else {
-            session()->flash('error', $res['error'] ?? 'Error approving request.');
+            session()->flash('error', $res['error'] ?? __('Error approving request.'));
         }
     }
 

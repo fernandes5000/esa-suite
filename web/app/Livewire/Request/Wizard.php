@@ -77,7 +77,10 @@ class Wizard extends Component
         if ($this->step == 5) {
             $this->validate([
                 'description' => 'required|string|min:20|max:5000'
-            ], ['description.required' => __('This field is required.')]);
+            ], [
+                'description.required' => __('This field is required.'),
+                'description.min'      => __('The description must be at least 20 characters.'),
+            ]);
         }
         if ($this->step == 6) {
             $this->validate([

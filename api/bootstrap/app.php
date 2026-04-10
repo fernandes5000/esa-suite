@@ -7,6 +7,7 @@ use Spatie\Permission\Middleware\PermissionMiddleware;
 use App\Http\Middleware\ForceTokenFromQuery;
 use App\Http\Middleware\EnsureUserIsNotBanned;
 use Illuminate\Http\Request;
+use Illuminate\Auth\AuthenticationException;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -17,6 +18,7 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
+            'auth' => \App\Http\Middleware\Authenticate::class,
             'permission' => PermissionMiddleware::class,
             'token.query' => ForceTokenFromQuery::class,
             'not.banned' => EnsureUserIsNotBanned::class,
@@ -25,5 +27,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->trustProxies(at: '*');
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        $exceptions->render(function (AuthenticationException $e, Request $request) {
+            return response()->json(['ok' => false, 'message' => 'Unauthenticated.'], 401);
+        });
     })->create();
