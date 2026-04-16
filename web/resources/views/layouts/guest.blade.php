@@ -17,10 +17,13 @@
             <div class="bg-white shadow-2xl rounded-2xl p-10">
                 @yield('content')
             </div>
+
+            <p class="text-center text-xs text-gray-400 mt-6">
+                {{ __('This is a demonstration project. All data is fictitious and has no legal value.') }}
+            </p>
         </div>
     </div>
 
     @livewireScripts
-    <script src="{{ asset('js/alpine.js') }}?v={{ filemtime(public_path('js/alpine.js')) }}" defer></script>
 </body>
 </html>

@@ -20,28 +20,28 @@
         <div>
             <label for="name" class="block text-sm font-medium text-gray-700">{{ __('Name') }}</label>
             <input id="name" type="text" name="name"
-                   class="block w-full mt-1 border-gray-300 rounded-md shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50" 
+                   class="block w-full mt-1 px-3 py-2 border-gray-300 rounded-md shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50" 
                    value="{{ old('name') }}" required autofocus>
         </div>
 
         <div class="mt-4">
             <label for="email" class="block text-sm font-medium text-gray-700">{{ __('Email') }}</label>
             <input id="email" type="email" name="email"
-                   class="block w-full mt-1 border-gray-300 rounded-md shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50" 
+                   class="block w-full mt-1 px-3 py-2 border-gray-300 rounded-md shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50" 
                    value="{{ old('email') }}" required>
         </div>
 
         <div class="mt-4">
             <label for="password" class="block text-sm font-medium text-gray-700">{{ __('Password') }}</label>
             <input id="password" type="password" name="password"
-                   class="block w-full mt-1 border-gray-300 rounded-md shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+                   class="block w-full mt-1 px-3 py-2 border-gray-300 rounded-md shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
                    required>
         </div>
 
         <div class="mt-4">
             <label for="password_confirmation" class="block text-sm font-medium text-gray-700">{{ __('Confirm Password') }}</label>
             <input id="password_confirmation" type="password" name="password_confirmation"
-                   class="block w-full mt-1 border-gray-300 rounded-md shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+                   class="block w-full mt-1 px-3 py-2 border-gray-300 rounded-md shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
                    required>
         </div>
 
@@ -51,7 +51,7 @@
             </a>
 
             <button type="submit" 
-                    class="ml-4 inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-700 active:bg-blue-800 focus:outline-none focus:border-blue-800 focus:ring ring-blue-300 disabled:opacity-25 transition">
+                    class="ml-4 inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-700 active:bg-blue-800 focus:outline-none focus:border-blue-800 focus:ring ring-blue-300 disabled:opacity-25 transition cursor-pointer">
                 {{ __('Register') }}
             </button>
         </div>
