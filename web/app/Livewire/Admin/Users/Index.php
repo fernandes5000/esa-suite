@@ -31,7 +31,7 @@ class Index extends Component
         $res = $client->get('/v1/admin/users');
 
         if ($res['ok'] ?? false) {
-            $this->users = $res['data'] ?? [];
+            $this->users = $res['data']['data'] ?? $res['data'] ?? [];
         } else {
             $this->users = [];
             session()->flash('error', $res['error'] ?? __('Failed to load users.'));

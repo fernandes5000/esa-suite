@@ -7,6 +7,7 @@ use App\Http\Resources\Admin\UserResource;
 use App\Http\Traits\ApiResponseTrait;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 use Spatie\Permission\Models\Role;
@@ -18,10 +19,13 @@ class UserController extends Controller
     /**
      * Display a listing of the users.
      */
-    public function index()
+    public function index(Request $request)
     {
-        $users = User::with('roles')->orderBy('name')->get();
-        return $this->apiSuccess(UserResource::collection($users));
+        $users = User::with('roles')
+            ->orderBy('name')
+            ->paginate($request->integer('per_page', 50));
+
+        return $this->apiSuccess(UserResource::collection($users)->response()->getData(true));
     }
 
     /**
@@ -56,34 +60,35 @@ class UserController extends Controller
 
         $adminUser = $request->user();
 
-        $user->update([
-            'name' => $validated['name'],
-            'email' => $validated['email'],
-        ]);
-
-        if (!empty($validated['password'])) {
-            $user->password = Hash::make($validated['password']);
-            $user->save();
-        }
-
         $newRoles = $validated['roles'];
         if ($user->id === $adminUser->id && $user->getRoleNames()->diff($newRoles)->isNotEmpty()) {
             return $this->apiError(__('You cannot change your own roles.'), 403);
         }
-        $user->syncRoles($newRoles);
 
         $isBanned = (bool) $validated['is_banned'];
-        
         if ($user->id === $adminUser->id && $isBanned) {
             return $this->apiError(__('You cannot ban yourself.'), 403);
         }
 
-        if ($isBanned && !$user->banned_at) {
-            $user->banned_at = now();
-        } elseif (!$isBanned && $user->banned_at) {
-            $user->banned_at = null;
-        }
-        $user->save();
+        DB::transaction(function () use ($user, $validated, $newRoles, $isBanned) {
+            $user->update([
+                'name' => $validated['name'],
+                'email' => $validated['email'],
+            ]);
+
+            if (!empty($validated['password'])) {
+                $user->password = Hash::make($validated['password']);
+            }
+
+            if ($isBanned && !$user->banned_at) {
+                $user->banned_at = now();
+            } elseif (!$isBanned && $user->banned_at) {
+                $user->banned_at = null;
+            }
+
+            $user->save();
+            $user->syncRoles($newRoles);
+        });
 
         $user->load('roles');
         return $this->apiSuccess(new UserResource($user));
