@@ -71,7 +71,7 @@
                                 $currentLocale = app()->getLocale();
                             @endphp
                             
-                            <button class="flex items-center text-xl" onclick="this.nextElementSibling.classList.toggle('hidden')">
+                            <button class="flex items-center text-xl cursor-pointer" onclick="this.nextElementSibling.classList.toggle('hidden')">
                                 {{ $locales[$currentLocale] }}
                             </button>
                             
@@ -93,8 +93,8 @@
                         
                         <form method="POST" action="{{ route('logout') }}" class="m-0">
                             @csrf
-                            <button type="submit" 
-                                    class="text-sm text-gray-500 hover:text-red-500 transition">
+                            <button type="submit"
+                                    class="text-sm text-gray-500 hover:text-red-500 transition cursor-pointer">
                                 {{ __('Logout') }}
                             </button>
                         </form>
@@ -155,7 +155,7 @@
                         
                         <form method="POST" action="{{ route('logout') }}">
                             @csrf
-                            <button type="submit" class="w-full text-left block pl-3 pr-4 py-2 border-l-4 border-transparent text-base font-medium text-gray-600 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-800 transition">
+                            <button type="submit" class="w-full text-left block pl-3 pr-4 py-2 border-l-4 border-transparent text-base font-medium text-gray-600 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-800 transition cursor-pointer">
                                 {{ __('Logout') }}
                             </button>
                         </form>
@@ -185,6 +185,5 @@
     </div>
     
     @livewireScripts
-    <script src="{{ asset('js/alpine.js') }}?v={{ filemtime(public_path('js/alpine.js')) }}" defer></script>
 </body>
 </html>

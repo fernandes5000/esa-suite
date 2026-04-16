@@ -35,6 +35,9 @@
         <div class="footer">
             <p>US Service Animals & Dog Academy</p>
             <p>Authorized by Licensed Therapist</p>
+            <p style="margin-top: 12px; font-size: 11px; color: #aaa;">
+                This document is part of a demonstration project and has no legal or real value.
+            </p>
         </div>
     </div>
 </body>
