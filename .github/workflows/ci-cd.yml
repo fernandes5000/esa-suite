@@ -58,7 +58,7 @@ jobs:
           CLOUDFLARE_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
           CLOUDFLARE_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
         run: |
-          cloudflared access token --app-url https://${{ secrets.SERVER_HOST }}
+          cloudflared access token --app https://${{ secrets.SERVER_HOST }}
 
       - name: Deploy over SSH
         env:
