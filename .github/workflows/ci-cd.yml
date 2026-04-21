@@ -53,17 +53,12 @@ jobs:
           echo "  StrictHostKeyChecking no" >> ~/.ssh/config
           echo "  User ${{ secrets.SERVER_USER }}" >> ~/.ssh/config
 
-      - name: Authenticate Cloudflare Access
-        env:
-          CLOUDFLARE_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
-          CLOUDFLARE_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
-        run: |
-          cloudflared access token --app https://${{ secrets.SERVER_HOST }}
-
       - name: Deploy over SSH
         env:
           CLOUDFLARE_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
           CLOUDFLARE_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
         run: |
           ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
             set -uxo pipefail
