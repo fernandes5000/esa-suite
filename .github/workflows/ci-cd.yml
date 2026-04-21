@@ -20,7 +20,7 @@ jobs:
         run: |
           if [[ "${GITHUB_REF}" == "refs/heads/main" ]]; then
             echo "BRANCH=main" >> $GITHUB_ENV
-            echo "DIR_PATH=/opt/docker/esa-prod" >> $GITHUB_ENV
+            echo "DIR_PATH=/opt/docker/esa" >> $GITHUB_ENV
             echo "ENV_B64=${{ secrets.ENV_PROD_BASE64 }}" >> $GITHUB_ENV
             echo "DOMAIN=esa.engineer.ninja" >> $GITHUB_ENV
             echo "API_DOMAIN=esa-api.engineer.ninja" >> $GITHUB_ENV
