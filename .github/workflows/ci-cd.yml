@@ -87,6 +87,7 @@ jobs:
               git fetch --all --prune --quiet
               git checkout "$BRANCH" --force
               git reset --hard "origin/$BRANCH"
+              sudo chown -R deployer:deployer "$DIR_PATH"
             fi
 
             # 2. Dynamic Domain
