@@ -66,7 +66,8 @@ jobs:
             DIR_PATH="${{ env.DIR_PATH }}"
             BRANCH="${{ env.BRANCH }}"
             ENV_B64="${{ env.ENV_B64 }}"
-            
+            GH_TOKEN="${{ secrets.GITHUB_TOKEN }}"
+
             export COMPOSE_PROJECT_NAME="esa_${BRANCH}"
 
             echo "Deploying to $DIR_PATH (branch: $BRANCH) with Project Name: $COMPOSE_PROJECT_NAME"
@@ -74,12 +75,13 @@ jobs:
             # 1. Git Setup / Clone or Update
             if [ ! -d "$DIR_PATH/.git" ]; then
               echo "Directory does not exist or is not a git repository. Cloning..."
-              mkdir -p "$DIR_PATH"
-              git clone -b "$BRANCH" git@github.com:fernandes5000/esa-suite.git "$DIR_PATH"
+              rm -rf "$DIR_PATH"
+              git clone -b "$BRANCH" "https://x-access-token:${GH_TOKEN}@github.com/fernandes5000/esa-suite.git" "$DIR_PATH"
               cd "$DIR_PATH"
             else
               echo "Directory exists. Fetching updates..."
               cd "$DIR_PATH"
+              git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/fernandes5000/esa-suite.git"
               sudo git clean -fdx
               sudo git reset --hard
               git fetch --all --prune --quiet
