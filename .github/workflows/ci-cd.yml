@@ -48,15 +48,17 @@ jobs:
       - name: Configure SSH via Cloudflare Tunnel
         run: |
           mkdir -p ~/.ssh
-          cat >> ~/.ssh/config << 'SSHCONF'
-          Host ${{ secrets.SERVER_HOST }}
-            ProxyCommand cloudflared access ssh --hostname %h
-            StrictHostKeyChecking no
-            User ${{ secrets.SERVER_USER }}
-          SSHCONF
+          echo "Host ${{ secrets.SERVER_HOST }}" >> ~/.ssh/config
+          echo "  ProxyCommand cloudflared access ssh --hostname %h" >> ~/.ssh/config
+          echo "  StrictHostKeyChecking no" >> ~/.ssh/config
+          echo "  User ${{ secrets.SERVER_USER }}" >> ~/.ssh/config
+
+      - name: Authenticate Cloudflare Access
         env:
           CLOUDFLARE_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
           CLOUDFLARE_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+        run: |
+          cloudflared access token --app-url https://${{ secrets.SERVER_HOST }}
 
       - name: Deploy over SSH
         env:
