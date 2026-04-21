@@ -20,17 +20,17 @@ jobs:
         run: |
           if [[ "${GITHUB_REF}" == "refs/heads/main" ]]; then
             echo "BRANCH=main" >> $GITHUB_ENV
-            echo "DIR_PATH=/home/deployer/esa-prod" >> $GITHUB_ENV
+            echo "DIR_PATH=/opt/docker/esa-prod" >> $GITHUB_ENV
             echo "ENV_B64=${{ secrets.ENV_PROD_BASE64 }}" >> $GITHUB_ENV
             echo "DOMAIN=esa.engineer.ninja" >> $GITHUB_ENV
           elif [[ "${GITHUB_REF}" == "refs/heads/staging" ]]; then
             echo "BRANCH=staging" >> $GITHUB_ENV
-            echo "DIR_PATH=/home/deployer/esa-stage" >> $GITHUB_ENV
+            echo "DIR_PATH=/opt/docker/esa-stage" >> $GITHUB_ENV
             echo "ENV_B64=${{ secrets.ENV_STAGE_BASE64 }}" >> $GITHUB_ENV
             echo "DOMAIN=esa-stage.engineer.ninja" >> $GITHUB_ENV
           else
             echo "BRANCH=dev" >> $GITHUB_ENV
-            echo "DIR_PATH=/home/deployer/esa-dev" >> $GITHUB_ENV
+            echo "DIR_PATH=/opt/docker/esa-dev" >> $GITHUB_ENV
             echo "ENV_B64=${{ secrets.ENV_DEV_BASE64 }}" >> $GITHUB_ENV
             echo "DOMAIN=esa-dev.engineer.ninja" >> $GITHUB_ENV
           fi
@@ -40,9 +40,30 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.SERVER_SSH_KEY }}
 
-      - name: Deploy over SSH
+      - name: Install cloudflared
         run: |
-          ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
+          wget -q https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+          sudo dpkg -i cloudflared-linux-amd64.deb
+
+      - name: Configure SSH via Cloudflare Tunnel
+        run: |
+          mkdir -p ~/.ssh
+          cat >> ~/.ssh/config << 'SSHCONF'
+          Host ${{ secrets.SERVER_HOST }}
+            ProxyCommand cloudflared access ssh --hostname %h
+            StrictHostKeyChecking no
+            User ${{ secrets.SERVER_USER }}
+          SSHCONF
+        env:
+          CLOUDFLARE_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CLOUDFLARE_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+
+      - name: Deploy over SSH
+        env:
+          CLOUDFLARE_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CLOUDFLARE_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+        run: |
+          ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
             set -uxo pipefail
 
             DIR_PATH="${{ env.DIR_PATH }}"
