@@ -148,7 +148,7 @@ jobs:
             echo "=== WEB: build assets START ==="
             cd web
             rm -rf node_modules public/build
-            npm install --legacy-peer-deps
+            npm install --legacy-peer-deps --cache /tmp/npm-cache-$$
             npm run build
             cd ..
             echo "=== WEB: build assets DONE ==="
