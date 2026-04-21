@@ -96,10 +96,13 @@ jobs:
             # 2. Dynamic Domain
             if echo "$DIR_PATH" | grep -q "esa-dev"; then
               DOMAIN="esa-dev.engineer.ninja"
+              API_DOMAIN="esa-dev-api.engineer.ninja"
             elif echo "$DIR_PATH" | grep -q "esa-stage"; then
               DOMAIN="esa-stage.engineer.ninja"
+              API_DOMAIN="esa-stage-api.engineer.ninja"
             else
               DOMAIN="esa.engineer.ninja"
+              API_DOMAIN="esa-api.engineer.ninja"
             fi
 
             # 3. Environment Setup
