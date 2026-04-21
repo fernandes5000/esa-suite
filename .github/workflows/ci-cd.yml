@@ -75,7 +75,7 @@ jobs:
             # 1. Git Setup / Clone or Update
             if [ ! -d "$DIR_PATH/.git" ]; then
               echo "Directory does not exist or is not a git repository. Cloning..."
-              rm -rf "$DIR_PATH"
+              sudo rm -rf "$DIR_PATH"
               git clone -b "$BRANCH" "https://x-access-token:${GH_TOKEN}@github.com/fernandes5000/esa-suite.git" "$DIR_PATH"
               cd "$DIR_PATH"
             else
@@ -148,7 +148,7 @@ jobs:
             echo "=== WEB: build assets START ==="
             cd web
             rm -rf node_modules public/build
-            npm ci --legacy-peer-deps
+            npm install --legacy-peer-deps
             npm run build
             cd ..
             echo "=== WEB: build assets DONE ==="
