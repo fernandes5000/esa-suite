@@ -23,16 +23,19 @@ jobs:
             echo "DIR_PATH=/opt/docker/esa-prod" >> $GITHUB_ENV
             echo "ENV_B64=${{ secrets.ENV_PROD_BASE64 }}" >> $GITHUB_ENV
             echo "DOMAIN=esa.engineer.ninja" >> $GITHUB_ENV
+            echo "API_DOMAIN=esa-api.engineer.ninja" >> $GITHUB_ENV
           elif [[ "${GITHUB_REF}" == "refs/heads/staging" ]]; then
             echo "BRANCH=staging" >> $GITHUB_ENV
             echo "DIR_PATH=/opt/docker/esa-stage" >> $GITHUB_ENV
             echo "ENV_B64=${{ secrets.ENV_STAGE_BASE64 }}" >> $GITHUB_ENV
             echo "DOMAIN=esa-stage.engineer.ninja" >> $GITHUB_ENV
+            echo "API_DOMAIN=esa-stage-api.engineer.ninja" >> $GITHUB_ENV
           else
             echo "BRANCH=dev" >> $GITHUB_ENV
             echo "DIR_PATH=/opt/docker/esa-dev" >> $GITHUB_ENV
             echo "ENV_B64=${{ secrets.ENV_DEV_BASE64 }}" >> $GITHUB_ENV
             echo "DOMAIN=esa-dev.engineer.ninja" >> $GITHUB_ENV
+            echo "API_DOMAIN=esa-dev-api.engineer.ninja" >> $GITHUB_ENV
           fi
 
       - name: Setup SSH
@@ -93,10 +96,13 @@ jobs:
             # 2. Dynamic Domain
             if echo "$DIR_PATH" | grep -q "esa-dev"; then
               DOMAIN="esa-dev.engineer.ninja"
+              API_DOMAIN="esa-dev-api.engineer.ninja"
             elif echo "$DIR_PATH" | grep -q "esa-stage"; then
               DOMAIN="esa-stage.engineer.ninja"
+              API_DOMAIN="esa-stage-api.engineer.ninja"
             else
               DOMAIN="esa.engineer.ninja"
+              API_DOMAIN="esa-api.engineer.ninja"
             fi
 
             # 3. Environment Setup
@@ -109,7 +115,7 @@ jobs:
 
             sed -i "s|API_BASE_URL=.*|API_BASE_URL=http://api-nginx|" web/.env
             sed -i "s|API_URL=.*|API_URL=http://api-nginx/api|" web/.env
-            sed -i "s|API_PUBLIC_URL=.*|API_PUBLIC_URL=https://$DOMAIN/api|" web/.env
+            sed -i "s|API_PUBLIC_URL=.*|API_PUBLIC_URL=https://$API_DOMAIN/api|" web/.env
 
             # 4. Storage & permissions
             # www-data in php:8.4-fpm (Debian) is UID 33 / GID 33
